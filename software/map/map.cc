@@ -1,10 +1,14 @@
-#include <ifstream>
-#include <string>
+#include <fstream>
+#include <iostream>
 #include <cstring>
+#include <cstdlib>
+#include <string>
 
 #include "map.h"
 
-Map::Map() : map_filename("playing_area.map") {}
+Map::Map(){
+  std::strcpy("playing_area.map", map_filename);
+}
 
 void Map::populate() {
   /*  Function that parses the .map file containing nicely human-readable
@@ -24,22 +28,19 @@ void Map::populate() {
   bool are_dealing_with_points = true;
   Point current_point;
   Line current_line;
-  char point_name[2];
 
   while (map_file.good()) {
-    if (line_num = 1 && cur_line != "POINTS:\n") {
+    if (line_num = 1 && (std::string(cur_line) != "POINTS:\n")) {
       // Sanity check here
-      std::cout << "Invalid map file specified."
+      std::cout << "Invalid map file specified.";
     }
 
-    else if (cur_line == "LINES:\n") are_dealing_with_points = false;
+    else if (std::string(cur_line) == "LINES:\n") are_dealing_with_points = false;
 
     else if (are_dealing_with_points) {
       // Using the *HORRIBLE* std::strtok function, which is probably
       // one of the reasons why nobody uses C anymore these days. 
-      point_name = std::strtok(cur_line, " \n");
-      current_point.name[0] = point_name[0];
-      current_point.name[1] = point_name[1];
+      strcpy(std::strtok(cur_line, " \n"), current_point.name);
 
       current_point.coord_x = std::atoi(std::strtok(NULL, " \n"));
 
@@ -50,29 +51,25 @@ void Map::populate() {
     }
 
     else { // We're dealing with lines
-      point_name = std::strtok(cur_line, " \n");
-      current_line.point1[0] = point_name[0];
-      current_line.point1[1] = point_name[1];
+      strcpy(std::strtok(cur_line, " \n"), current_line.point1);
 
-      point_name = std::strtok(NULL, " \n");
-      current_line.point2[0] = point_name[0];
-      current_line.point2[1] = point_name[1];
+      strcpy(std::strtok(NULL, " \n"), current_line.point2);
 
-      switch (std::strtok(NULL, " \n")) {
-      case "S":
+      switch (*(std::strtok(NULL, " \n"))) {
+      case 'S':
         current_line.is_straight = true;
-      case "C":
+      case 'C':
         current_line.is_straight = false;
       }
 
-      switch (std::strtok(NULL, " \n")) {
-      case "V":
+      switch (*(std::strtok(NULL, " \n"))) {
+      case 'V':
         current_line.orientation = 0;
-      case "H":
+      case 'H':
         current_line.orientation = 1;
-      case "P":
+      case 'P':
         current_line.orientation = 2;
-      case "N":
+      case 'N':
         current_line.orientation = 3;
       }
 
@@ -83,4 +80,9 @@ void Map::populate() {
   map_file.close();
 
   // WHEW!
+}
+
+int main(int argc, char* argv[]) {
+  // This function exists only to make stuff compile.
+  return 0;
 }

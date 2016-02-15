@@ -1,12 +1,14 @@
-#include <string>
+#include <vector>
 
 class Point {
+public:
   char name[2];
   double coord_x;
   double coord_y;
 };
 
 class Line {
+public:
   char point1[2];
   char point2[2];
 
@@ -25,7 +27,7 @@ public:
   void populate();
 
 private:
-  std::string map_filename;
-  vector<Point> _points;
-  vector<Line> _lines;
+  char map_filename[256];
+  std::vector<Point> _points;
+  std::vector<Line> _lines;
 };
