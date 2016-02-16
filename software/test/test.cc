@@ -13,7 +13,13 @@ int main ()
 {
   int val;  // returned data from microprocessor
 
-  if (!rlink.initialise (ROBOT_NUM)) {      // setup the link
+  #ifndef __arm__
+  int rc = rlink.initialise(ROBOT_NUM);
+  #else
+  int rc = rlink.initialise();
+  #endif
+
+  if (!rc) {      // setup the link
     cout << "Cannot initialise link" << endl;
     rlink.print_errs("    ");
     return -1;
