@@ -6,11 +6,11 @@
 
 #include "map.h"
 
-Map::Map(){
+idp::Map::Map(){
   std::strcpy("playing_area.map", map_filename);
 }
 
-void Map::populate() {
+int idp::Map::populate() {
   /*  Function that parses the .map file containing nicely human-readable
       information about point and line positioning on the playing area.
       This function contains absolutely horrible code with c-string handling.
@@ -29,49 +29,80 @@ void Map::populate() {
   Point current_point;
   Line current_line;
 
-  while (map_file.good()) {
-    if (line_num = 1 && (std::string(cur_line) != "POINTS:\n")) {
-      // Sanity check here
-      std::cout << "Invalid map file specified.";
-    }
+  map_file.getline(cur_line, 16);
+  if (std::string(cur_line) != "POINTS:\n") {
+    // Sanity check here
+    std::cout << "Invalid map file specified.";
+    return -1;
+  }
 
-    else if (std::string(cur_line) == "LINES:\n") are_dealing_with_points = false;
+  while (map_file.good()) {
+    map_file.getline(cur_line, 16);
+    if (std::string(cur_line) == "LINES:\n") are_dealing_with_points = false;
 
     else if (are_dealing_with_points) {
       // Using the *HORRIBLE* std::strtok function, which is probably
       // one of the reasons why nobody uses C anymore these days. 
-      strcpy(std::strtok(cur_line, " \n"), current_point.name);
+      // Basically you need to check if it returns NULL every time you
+      // call it, otherwise nasty runtime pointer resolving errors can
+      // occur.
 
-      current_point.coord_x = std::atoi(std::strtok(NULL, " \n"));
+      char* strtok_return;
 
-      current_point.coord_y = std::atoi(std::strtok(NULL, " \n"));
+      strtok_return = std::strtok(cur_line, " \n");
+      if (strtok_return != NULL) strcpy(strtok_return, current_point.name);
+      else return -1;
+
+      strtok_return = std::strtok(NULL, " \n");
+      if (strtok_return != NULL) current_point.coord_x = std::atof(strtok_return);
+      else return -1;
+      
+      strtok_return = std::strtok(NULL, " \n");
+      if (strtok_return != NULL) current_point.coord_y = std::atof(strtok_return);
+      else return -1;
 
       // Append to member variable
       _points.push_back(current_point);
     }
 
-    else { // We're dealing with lines
-      strcpy(std::strtok(cur_line, " \n"), current_line.point1);
+    else { 
+      // We're dealing with lines
+      
+      char* strtok_return;
 
-      strcpy(std::strtok(NULL, " \n"), current_line.point2);
+      strtok_return = std::strtok(cur_line, " \n");
+      if (strtok_return != NULL) strcpy(strtok_return, current_line.point1);
+      else return -1;
 
-      switch (*(std::strtok(NULL, " \n"))) {
-      case 'S':
-        current_line.is_straight = true;
-      case 'C':
-        current_line.is_straight = false;
+      strtok_return = std::strtok(NULL, " \n");
+      if (strtok_return != NULL) strcpy(strtok_return, current_line.point1);
+      else return -1;
+
+      strtok_return = std::strtok(NULL, " \n");
+      if (strtok_return != NULL) {
+        switch (*strtok_return) {
+        case 'S':
+          current_line.is_straight = true;
+        case 'C':
+          current_line.is_straight = false;
+        }
       }
+      else return -1;
 
-      switch (*(std::strtok(NULL, " \n"))) {
-      case 'V':
-        current_line.orientation = 0;
-      case 'H':
-        current_line.orientation = 1;
-      case 'P':
-        current_line.orientation = 2;
-      case 'N':
-        current_line.orientation = 3;
+      strtok_return = std::strtok(NULL, " \n");
+      if (strtok_return != NULL) {
+        switch (*strtok_return) {
+        case 'V':
+          current_line.orientation = 0;
+        case 'H':
+          current_line.orientation = 1;
+        case 'P':
+          current_line.orientation = 2;
+        case 'N':
+          current_line.orientation = 3;
+        }
       }
+      else return -1;
 
       // Append to member variable
       _lines.push_back(current_line);
@@ -79,7 +110,11 @@ void Map::populate() {
   }
   map_file.close();
 
+  std::cout << "Read " << _points.size() << " points and "
+            << _lines.size() << " lines from file." << std::endl;
+ 
   // WHEW!
+  return 0;
 }
 
 int main(int argc, char* argv[]) {

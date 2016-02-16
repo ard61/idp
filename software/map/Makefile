@@ -1,2 +1,2 @@
 map : map.cc 
-	 g++ -Wall map.cc -o map
+	g++ -Wall map.cc -o map

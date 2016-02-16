@@ -1,11 +1,13 @@
 #include <vector>
 
+namespace idp {
+
 class Point {
 public:
   char name[2];
   double coord_x;
   double coord_y;
-};
+}; // class Point
 
 class Line {
 public:
@@ -19,15 +21,17 @@ public:
       2 if at 45 degrees anticlockwise from horizontal
       3 if at 45 degrees clockwise from horizontal
   */
-};
+}; // class Line
 
 class Map {
 public:
   Map();
-  void populate();
+  int populate();
 
 private:
   char map_filename[256];
   std::vector<Point> _points;
   std::vector<Line> _lines;
-};
+}; // class Map
+
+} // namespace idp
