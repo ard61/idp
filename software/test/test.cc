@@ -34,11 +34,11 @@ int main ()
   for (int i = 0; i < num_tests; i++) {
     val = rlink.request (TEST_INSTRUCTION);   // send test instruction
   }
-  sw.stop();
+  int etime = sw.stop();
 
   if (val == TEST_INSTRUCTION_RESULT) {     // check result
     cout << "Test passed" << endl;
-    cout << "Each test took on average " << (double) sw.read()/num_tests << " milliseconds." << endl;
+    cout << "Each test took on average " << (double) etime/num_tests << " milliseconds." << endl;
     return 0;                             // all OK, finish
   }
   
