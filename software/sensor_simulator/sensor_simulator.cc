@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
       }
 
       else {
-        std::cout << "Error occured while requesting I2C port " 
-                  << i << " ." << std::endl;
+        // Return dummy value to signify that port is inactive
+        I2C_readings[i] = -1;
       }
     }
 
