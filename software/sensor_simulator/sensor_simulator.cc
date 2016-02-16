@@ -26,11 +26,11 @@ int main(int argc, char* argv[]) {
 
   int I2C_readings[8];
   const int I2C_display_width = 6;
+
+  std::cout << "Listening on I2C ports 0-7. " << std::endl;
   
   while (!rlink.fatal_err())
   {
-    std::cout << "Listening on I2C ports 0-7. " << std::endl;
-    
     for (int i = 0; i < 8; i++) {
       rc = rlink.request(instruction_array[i]);
       
