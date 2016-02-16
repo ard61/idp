@@ -40,8 +40,7 @@ int main(int argc, char* argv[]) {
 
       else {
         std::cout << "Error occured while requesting I2C port " 
-                  << i << " . Exiting." << std::endl;
-        return -1;
+                  << i << " ." << std::endl;
       }
     }
 
