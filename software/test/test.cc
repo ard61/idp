@@ -21,7 +21,7 @@ int main ()
   int rc = rlink.initialise();
   #endif
 
-  if (!rc) {      // setup the link
+  if (!rc) { // setup the link
     cout << "Cannot initialise link" << endl;
     rlink.print_errs("    ");
     return -1;
@@ -38,7 +38,7 @@ int main ()
 
   if (val == TEST_INSTRUCTION_RESULT) {     // check result
     cout << "Test passed" << endl;
-    cout << "Each test took on average " << sw.read()/num_tests << " seconds." << endl;
+    cout << "Each test took on average " << (double)(sw.read())/num_tests << " milliseconds." << endl;
     return 0;                             // all OK, finish
   }
   
