@@ -5,6 +5,7 @@ using namespace std;
 
 #include <robot_instr.h>
 #include <robot_link.h>
+#include <stopwatch.h>
 
 #define ROBOT_NUM  9  // See number on our microcontroller
 
@@ -26,12 +27,18 @@ int main ()
     return -1;
   }
 
-  sleep(10);
+  stopwatch sw;
+  const int num_tests = 1000;
 
-  val = rlink.request (TEST_INSTRUCTION);   // send test instruction
+  sw.start();
+  for (int i = 0; i < num_tests; i++) {
+    val = rlink.request (TEST_INSTRUCTION);   // send test instruction
+  }
+  sw.stop();
 
   if (val == TEST_INSTRUCTION_RESULT) {     // check result
     cout << "Test passed" << endl;
+    cout << "Each test took on average " << sw.read()/num_tests << " seconds." << endl;
     return 0;                             // all OK, finish
   }
   
