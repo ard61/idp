@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 
 using namespace std;
 
@@ -24,6 +25,8 @@ int main ()
     rlink.print_errs("    ");
     return -1;
   }
+
+  sleep(10);
 
   val = rlink.request (TEST_INSTRUCTION);   // send test instruction
 
