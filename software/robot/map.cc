@@ -2,8 +2,8 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
-
-#include <boost/log/trivial.hpp>
+#include <iostream>
+#include <iomanip>
 
 #include "robot.h"
 
@@ -109,8 +109,8 @@ int idp::Map::populate(char* map_file) {
   }
   ifs.close();
 
-  BOOST_LOG_TRIVIAL(info) << "Read " << _points.size() << " points and "
-                          << _lines.size() << " lines from file." << std::endl;
+  std::cout << std::setw(10) << "INFO: " << "Read " << _points.size() << " points and "
+            << _lines.size() << " lines from file." << std::endl;
  
   // WHEW!
   return 0;

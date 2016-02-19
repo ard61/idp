@@ -3,12 +3,21 @@
 
 #include <string>
 #include <vector>
+#include <exception>
 
-#include <stopwatch.h>
 #include <robot_link.h>
+#include <robot_instr.h>
+#include <stopwatch.h>
 
 
 namespace idp {
+
+class LinkError : public std::exception {
+  virtual const char* what() const throw()
+  {
+    return "Error communicating with robot.";
+  }
+};
 
 class Vector2d {
 public:
@@ -49,6 +58,8 @@ public:
 
   // Initialisation
   void load_constants(int argc, char* argv[]);
+  int initialise_connection();
+  int test();
 
   // Propulsion
   int move(MotorDemand motor_demand);
@@ -72,6 +83,8 @@ private:
   robot_link _rlink;
 
   // Constants, loaded from config file / command line
+  int ROBOT_NUM;
+  int NUM_TESTS;
   double HALF_AXLE_LENGTH; // in m
   double MAX_SPEED; // in m/s
   std::string MAP_FILE;
