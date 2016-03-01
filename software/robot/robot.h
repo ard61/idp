@@ -21,19 +21,14 @@ Physical variables use SI:
 */
 
 
-class LinkError : public std::exception {
-  virtual const char* what() const throw()
-  {
-    return "Error communicating with robot.";
-  }
-};
-
 class Vector2d {
 public:
   Vector2d() : x(0.0), y(0.0) {}
   Vector2d(double _x, double _y) : x(_x), y(_y) {}
 
   Vector2d operator+ (const Vector2d &rhs) const { return Vector2d(x + rhs.x, y + rhs.y); }
+  Vector2d operator- (const Vector2d &rhs) const { return Vector2d(x - rhs.x, y - rhs.y); }
+
   Vector2d operator* (const Vector2d &rhs) const { return Vector2d(x * rhs.x, y * rhs.y); }
   friend Vector2d operator* (const double &lhs, const Vector2d &rhs) { return Vector2d(lhs * rhs.x, lhs * rhs.y); }
   friend Vector2d operator* (const Vector2d &lhs, const double &rhs) { return Vector2d(lhs.x * rhs, lhs.y * rhs); }
@@ -49,16 +44,6 @@ public:
 }; // class Vector2d
 
 
-class MotorDemand {
-  // Contains the speed of each of the two wheels.  
-public:
-  MotorDemand() : speed_l(0.0), speed_r(0.0) {}
-  MotorDemand(double &_speed_l, double &_speed_r) : speed_l(_speed_l), speed_r(_speed_r) {}
-
-  double speed_l;
-  double speed_r;
-}; // class MotorDemand
-
 template<typename T>
 struct Timestamp
 /*
@@ -71,23 +56,141 @@ when the value was last updated, although it can serve other functions.
   int ms;
 };
 
+
+class Point {
+public:
+  char name[2];
+  Vector2d position;
+  bool is_intersection;
+}; // class Point
+
+
+class Line {
+public:
+  char point1[2];
+  char point2[2];
+
+  bool is_straight;  // true for a straight line, false for circular arc
+  int orientation;
+  /*  0 if the straight line is vertical, or the circular arc from point1 to point2 is vertical
+      1 if horizontal
+      2 if at 45 degrees anticlockwise from horizontal
+      3 if at 45 degrees clockwise from horizontal
+  */
+}; // class Line
+
+
+class Map {
+public:
+  Map();
+  int populate(const char* map_file);
+  double distance_from_intersection(Vector2d position) const;
+
+private:
+  std::vector<Point> _points;
+  std::vector<Line> _lines;
+}; // class Map
+
+
+class PIDControlLoop {
+public:
+  PIDControlLoop() : _k_p(0.0), _k_i(0.0), _k_d(0.0), _derivative_smoothing_coef(0.0), 
+                     _ms(0), _error(0), _derror(0), _ierror(0) {}
+  void initialise(const double k_p, const double k_i, const double k_d, const double derivative_smoothing_coef);
+  void update(const Timestamp<double> error);
+  void clear() {
+    _ms = 0;
+    _error = 0.0;
+    _derror = 0.0;
+    _ierror = 0.0;
+  }
+  double get_demand() const;
+
+private:
+  double _k_p;
+  double _k_i;
+  double _k_d;
+
+  double _derivative_smoothing_coef;
+
+  int _ms;
+  double _error;
+  double _derror;
+  double _ierror;
+};
+
+
 class Robot {
+/*
+Light sensor board: I2C bus, address 101.
+  Pin 1-3: address 
+  Pin 4-7: Light sensors 1-4
+  Pin 8: ground
+  Pin 9-10: LED
+  Pin 11: LED (light sensor)
+  Pin 12: LED (light sensor)
+  Pin 13: Interrupt
+  Pin 14: SCL
+  Pin 15: SDA
+  Pin 16: 5V
+
+  Pin 1-3: address
+  Pin 4-10: ground
+  Pin 11: actuator circuit
+  Pin 12: actuator circuit
+  Pin 13 – 16: Interrupt / SCL / SDA / 5V
+*/
 public:
   Robot();
   ~Robot();
 
+  // Exceptions
+  class LinkError : public std::exception {
+    virtual const char* what() const throw()
+    {
+      return "Error communicating with robot.";
+    }
+  };
+
+  class LineFollowingError : public std::exception {
+    virtual const char* what() const throw()
+    {
+      return "Line following algorithm is lost.";
+    }  
+  };
+
+  class PositionTrackingError : public std::exception {
+    virtual const char* what() const throw()
+    {
+      return "Position tracking does not match light sensor information.";
+    }  
+  };
+
   // Initialisation
   void load_constants(int argc, char* argv[]);
   int initialise();
+  int reinitialise();
+  void configure();
   int test();
 
   // Propulsion
-  int move(MotorDemand &motor_demand);
-  int move(MotorDemand &motor_demand, double &distance);
-  int turn(double &angle);
-  void update_tracking();
+  class MotorDemand {
+    // Contains the speed of each of the two wheels.  
+  public:
+    MotorDemand() : speed_l(0.0), speed_r(0.0) {}
+    MotorDemand(const double &_speed_l, const double &_speed_r) : speed_l(_speed_l), speed_r(_speed_r) {}
+
+    double speed_l;
+    double speed_r;
+  }; // class MotorDemand
+
+  int move(const MotorDemand &motor_demand);
+  void turn(const double angle, const double angular_velocity);
+  void turn(const double angle);
 
   // Position tracking
+  void update_tracking();
+
   struct Tracking {
     double speed;
     double curvature;  // Curvature is K = (angular velocity) / speed
@@ -97,20 +200,26 @@ public:
   typedef std::vector<Timestamp<Tracking> > TrackingHistory;
 
   // Line following
-  union LineSensors {
+  union LightSensors {
     struct values { // 0 means white, 1 means black
-      unsigned int fore_l : 1;
-      unsigned int fore_c : 1;
-      unsigned int fore_r : 1;
-      unsigned int rear_c : 1;
+      unsigned int front_left : 1;
+      unsigned int front_center : 1;
+      unsigned int front_right : 1;
+      unsigned int rear_right : 1;
+      unsigned int _padding : 2;
+      unsigned int egg_sensor : 1;
+      unsigned int content_sensor : 1;
     };
     unsigned int cat;
-  }; // union LineSensors
+  }; // union LightSensors
 
-  void update_line_sensors();
+  typedef std::vector<Timestamp<LightSensors> > LightSensorsHistory;
+
+  void update_light_sensors();
   MotorDemand calculate_demand();
-  bool is_lost();
-  bool at_crossroad();
+
+  // Recovery
+  void recovery();
 
   // Egg processing
   void pickup_egg();
@@ -144,59 +253,33 @@ private:
     double initial_orientation;
     double curve_curvature;
     double cruise_speed;
+    double control_loop_kp;
+    double control_loop_ki;
+    double control_loop_kd;
+    double control_loop_derivative_smoothing_coef;
+    double intersection_threshold_distance;
   } _constants;
+
   // Line following
   // Sensor values
-  std::vector<LineSensors> _line_sensors;
+  LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
   // Targets
   double _target_curvature; // in m^(-1), positive if turning to the left (anticlockwise when going forward)
   double _target_speed; // in m/s
   // Indicators
   bool _on_line;
+  bool _at_crossroad;
+  PIDControlLoop _control_loop;
 
   // Velocity and position tracking:
   TrackingHistory *_tracking_history;  // Allocated on heap
 
-  /*
-  Not sure about this yet.
-  Timestamp<double> _position_tolerance_axial; // Axial tolerance is reset to white line width every time we reach a junction
-  Timestamp<double> _position_tolerance_tangential; // Tangential tolerance is white line width while we are on a line
-  */
+  // Map
+  Map *_map;
+  // Extra position tracking from map.  
+  int current_line;
+  int previous_point;
 }; // class Robot
-
-
-class Point {
-public:
-  char name[2];
-  Vector2d position;
-}; // class Point
-
-
-class Line {
-public:
-  char point1[2];
-  char point2[2];
-
-  bool is_straight;  // true for a straight line, false for circular arc
-  int orientation;
-  /*  0 if the straight line is vertical, or the circular arc from point1 to point2 is vertical
-      1 if horizontal
-      2 if at 45 degrees anticlockwise from horizontal
-      3 if at 45 degrees clockwise from horizontal
-  */
-}; // class Line
-
-
-class Map {
-public:
-  Map();
-  int populate(char* map_file);
-
-private:
-  std::vector<Point> _points;
-  std::vector<Line> _lines;
-}; // class Map
-
 
 } // namespace idp
 

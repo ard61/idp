@@ -1,31 +1,61 @@
 #include <iostream>
-#include <iomanip>
 
+#include "logging.h"
 #include "robot.h"
 
+stopwatch idp::logging::logging_stopwatch;
+
 int main(int argc, char* argv[]) {
+  idp::logging::log_init();
   idp::Robot r;
   
   r.load_constants(argc, argv);
 
   if (!r.initialise()) {
-    std::cout << std::setw(10) << "INFO: " << "Exiting. " << std::endl;
+    IDP_INFO << "Exiting. " << std::endl;
+    return -1;
+  }
+
+  try {
+    r.configure();
+  }
+  catch (idp::Robot::LinkError& e) {
+    IDP_INFO << "Exiting. " << std::endl;
     return -1;
   }
 
   try {
     r.test();
   }
-
-  catch (idp::LinkError& e) {
-    std::cout << std::setw(10) << "INFO: " << "Exiting. " << std::endl;
+  catch (idp::Robot::LinkError& e) {
+    IDP_INFO << "Exiting. " << std::endl;
     return -1;
   }
 
   // Main loop here.
-
   while (true) {
-    
+    try {
+      r.update_tracking();
+      r.update_light_sensors();
+      r.move(r.calculate_demand());
+
+    }
+    catch (idp::Robot::LineFollowingError& e) {
+      // We're lost! Enter recovery mode now.  
+
+
+      // Don't forget to reset PID control loop before resuming line following.  
+    }
+    catch (idp::Robot::PositionTrackingError& e) {
+      // Discrepancy between position tracking and another subsystem.  
+      // That's going to be really tricky to solve, UNLESS we are at a known intersection.  
+    }
+
+    catch (idp::Robot::LinkError& e) {
+      // Something's gone wrong with the link.  
+      if (!r.reinitialise())
+        return -1;
+    }
   }
 
   return 0;
