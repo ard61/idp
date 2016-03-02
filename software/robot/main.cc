@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
   idp::logging::log_init();
   idp::Robot r;
   
-  r.load_constants(argc, argv);
+  r.load_constants();
 
   if (!r.initialise()) {
     IDP_ERR << "Unable to connect to robot. Exiting." << std::endl;

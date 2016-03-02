@@ -3,11 +3,11 @@
 CC=g++
 ARM_CC=arm-linux-gnueabi-g++
 
-CFLAGS=-c -ansi -Wall -g -DBOOST_LOG_DYN_LINK -I/export/teach/1BRobot
-ARM_CFLAGS=-c -ansi -Wall -g -DBOOST_LOG_DYN_LINK -I/export/teach/1BRobot -I/usr/arm-unknown-linux-gnueabi/include
+CFLAGS=-c -ansi -Wall -g -I/export/teach/1BRobot
+ARM_CFLAGS=-c -ansi -Wall -g -I/export/teach/1BRobot -I/usr/arm-unknown-linux-gnueabi/include
 
-LDFLAGS=-L/export/teach/1BRobot -lrobot -lboost_program_options
-ARM_LDFLAGS=-L/usr/arm-unknown-linux-gnueabi/lib -lrobot -lboost_program_options
+LDFLAGS=-L/export/teach/1BRobot -lrobot
+ARM_LDFLAGS=-L/usr/arm-unknown-linux-gnueabi/lib -lrobot
 
 SOURCES=main.cc robot.cc map.cc robot.h logging.h
 

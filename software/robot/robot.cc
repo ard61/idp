@@ -1,12 +1,8 @@
 #include <fstream>
 #include <iostream>
 
-#include <boost/program_options.hpp>
-
 #include "logging.h"
 #include "robot.h"
-
-const char idp::Robot::config_file[] = "robot.cfg";
 
 void idp::PIDControlLoop::initialise(const double k_p, const double k_i, const double k_d, const double derivative_smoothing_coef) {
   _k_p = k_p;
@@ -50,51 +46,31 @@ idp::Robot::~Robot() {
   delete _map;
 }
 
-void idp::Robot::load_constants(int argc, char* argv[]) {
-  /*
-  Retrieves values for constants from command line and from configuration file
-  using the boost/program_options library
-  */
+void idp::Robot::load_constants() {
+  // Initialisation
+  _constants.robot_num = 9;  // Wireless interface identifier for our robot
+  _constants.map_file = "playing_area.map";  // playing area map filename
+  _constants.num_tests = 100;  // Number of tests in each test command
 
-  namespace po = boost::program_options;
-  po::options_description config("Configuration");
+  // Propulsion
+  _constants.half_axle_length = 10.0;  // half-axle length
+  _constants.max_speed = 0.2;  // maximum speed of robot
+  _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
+  _constants.cruise_speed = 0.03;  // Standard speed of the robot
+  _constants.ramp_time = 255;  // Ramp time for robot motors
 
-  config.add_options()
-    ("robot_num", po::value<int>(&(_constants.robot_num))->default_value(9), "Wireless interface identifier for our robot")
-    ("num_tests", po::value<int>(&(_constants.num_tests))->default_value(100), "Number of tests in each test command")
-    ("half_axle_length", po::value<double>(&(_constants.half_axle_length))->default_value(10.0), "half-axle length")
-    ("max_speed", po::value<double>(&(_constants.max_speed))->default_value(0.2), "maximum speed of robot")
-    ("map_file", po::value<std::string>(&(_constants.map_file))->default_value("playing_area.map"), "playing area map filename")
-    ("ramp_time", po::value<int>(&(_constants.ramp_time))->default_value(255), "Ramp time for robot motors")
-    ("initial_position_x", po::value<double>(&(_constants.initial_position_x))->default_value(0.1), "Robot initial position, x-coordinate")
-    ("initial_position_y", po::value<double>(&(_constants.initial_position_y))->default_value(0.1), "Robot initial position, y-coordinate")
-    ("initial_orientation", po::value<double>(&(_constants.initial_orientation))->default_value(0), "Robot initial orientation")
-    ("curve_curvature", po::value<double>(&(_constants.curve_curvature))->default_value(1.67), "Curvature of the curved white line paths")
-    ("cruise_speed", po::value<double>(&(_constants.cruise_speed))->default_value(0.03), "Standard speed of the robot")
-    ("control_loop_kp", po::value<double>(&(_constants.control_loop_kp))->default_value(0.1), "Proportional control loop coefficient")
-    ("control_loop_ki", po::value<double>(&(_constants.control_loop_ki))->default_value(0), "Integral control loop coefficient")
-    ("control_loop_kd", po::value<double>(&(_constants.control_loop_kd))->default_value(0), "Derivative control loop coefficient")
-    ("control_loop_derivative_smoothing_coef", po::value<double>(&(_constants.control_loop_derivative_smoothing_coef))->default_value(1), "Control loop derivative smoothing coefficient")
-    ("intersection_threshold_distance", po::value<double>(&(_constants.intersection_threshold_distance))->default_value(0.05), "We are 'close' to an intersection if distance smaller than this value.")
-    ;
-  
-  po::variables_map vm;
+  // Tracking
+  _constants.initial_position_x = 0.1;  // Robot initial position, x-coordinate
+  _constants.initial_position_y = 0.1;  // Robot initial position, y-coordinate
+  _constants.initial_orientation = 0;  // Robot initial orientation
 
-  po::store(po::command_line_parser(argc, argv).options(config).run(), vm);
-  po::notify(vm);
-
-  std::ifstream ifs(config_file);
-  if (!ifs)
-  {
-      IDP_WARN << "Could not open config file: " << config_file << " ." << std::endl;
-      IDP_WARN << "Default values will be used for all parameters." << std::endl;
-  }
-
-  else
-  {
-      po::store(parse_config_file(ifs, config), vm);
-      po::notify(vm);
-  }
+  // Line following
+  _constants.control_loop_kp = 5;  // Proportional control loop coefficient
+  _constants.control_loop_ki = 0;  // Integral control loop coefficient
+  _constants.control_loop_kd = 0;  // Derivative control loop coefficient
+  _constants.control_loop_derivative_smoothing_coef = 0.8;  // Control loop derivative smoothing coefficient
+  _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
+  ;
 
   // Put the first value of position and speed in the _tracking_history data structure
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -228,7 +204,7 @@ void idp::Robot::turn(const double angle, const double angular_velocity) {
   int current_ms = _sw.read();
   move(motor_demand);
 
-  while (_sw.read() < delta_t_ms - 10) { // 10 ms to account for lag
+  while (_sw.read() - current_ms < delta_t_ms - 10) { // 10 ms to account for lag
     // Do nothing
   }
 
@@ -381,7 +357,7 @@ void idp::Robot::tracking_analysis() {
 
 idp::Robot::MotorDemand idp::Robot::calculate_demand() {
   idp::Robot::MotorDemand motor_demand;
-  
+
   motor_demand.speed_l = _target_speed * (1 - _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
   motor_demand.speed_r = _target_speed * (1 + _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
 

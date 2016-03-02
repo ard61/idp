@@ -167,7 +167,7 @@ public:
   };
 
   // Initialisation
-  void load_constants(int argc, char* argv[]);
+  void load_constants();
   int initialise();
   int reinitialise();
   void configure();
@@ -233,9 +233,6 @@ public:
   
 
 private:
-  // Config file name
-  static const char config_file[];
-
   // Stopwatch
   stopwatch _sw;
 
