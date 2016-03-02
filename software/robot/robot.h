@@ -216,6 +216,8 @@ public:
   typedef std::vector<Timestamp<LightSensors> > LightSensorsHistory;
 
   void update_light_sensors();
+  void line_sensor_analysis();
+  void tracking_analysis();
   MotorDemand calculate_demand();
 
   // Recovery
@@ -263,12 +265,9 @@ private:
   // Line following
   // Sensor values
   LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
-  // Targets
   double _target_curvature; // in m^(-1), positive if turning to the left (anticlockwise when going forward)
-  double _target_speed; // in m/s
-  // Indicators
-  bool _on_line;
-  bool _at_crossroad;
+  double _target_speed;
+  bool at_intersection;
   PIDControlLoop _control_loop;
 
   // Velocity and position tracking:

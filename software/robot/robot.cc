@@ -71,11 +71,11 @@ void idp::Robot::load_constants(int argc, char* argv[]) {
     ("initial_orientation", po::value<double>(&(_constants.initial_orientation))->default_value(0), "Robot initial orientation")
     ("curve_curvature", po::value<double>(&(_constants.curve_curvature))->default_value(1.67), "Curvature of the curved white line paths")
     ("cruise_speed", po::value<double>(&(_constants.cruise_speed))->default_value(0.03), "Standard speed of the robot")
-    ("control_loop_kp", po::value<double>(&(_constants.control_loop_kp))->default_value(1), "Proportional control loop coefficient")
-    ("control_loop_ki", po::value<double>(&(_constants.control_loop_ki))->default_value(0.1), "Integral control loop coefficient")
-    ("control_loop_kd", po::value<double>(&(_constants.control_loop_kd))->default_value(1), "Derivative control loop coefficient")
+    ("control_loop_kp", po::value<double>(&(_constants.control_loop_kp))->default_value(0.1), "Proportional control loop coefficient")
+    ("control_loop_ki", po::value<double>(&(_constants.control_loop_ki))->default_value(0), "Integral control loop coefficient")
+    ("control_loop_kd", po::value<double>(&(_constants.control_loop_kd))->default_value(0), "Derivative control loop coefficient")
     ("control_loop_derivative_smoothing_coef", po::value<double>(&(_constants.control_loop_derivative_smoothing_coef))->default_value(1), "Control loop derivative smoothing coefficient")
-    ("intersection_threshold_distance", po::value<double>(&(_constants.intersection_threshold_distance))->default_value(1), "We are 'close' to an intersection if distance smaller than this value.")
+    ("intersection_threshold_distance", po::value<double>(&(_constants.intersection_threshold_distance))->default_value(0.05), "We are 'close' to an intersection if distance smaller than this value.")
     ;
   
   po::variables_map vm;
@@ -298,133 +298,90 @@ void idp::Robot::update_light_sensors() {
 }
 
 
-idp::Robot::MotorDemand idp::Robot::calculate_demand() {
-
-  idp::Robot::MotorDemand motor_demand;
+void idp::Robot::line_sensor_analysis() {
 
   int line_sensors = _light_sensors_history->back().value.cat bitand 0x0F;
   int ms = _light_sensors_history->back().ms;
 
   idp::Timestamp<double> x;
 
-  // Do this if we know we are far from an intersection
-  if (_map->distance_from_intersection(_tracking_history->back().value.position) > _constants.intersection_threshold_distance) {
-    switch (line_sensors bitand 0x07) { // ignore rear sensor now
-      case 0x00:
-        // All black! We are definitely lost here.  
-        throw idp::Robot::LineFollowingError();
-        break;
+  bool close_to_intersection = (_map->distance_from_intersection(_tracking_history->back().value.position) > _constants.intersection_threshold_distance);
 
-      case 0x02:
-        // Center sensor is white, we are right on target.  
-        x.value = 0;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
+  switch (line_sensors bitand 0x07) { // ignore rear sensor now
+    case 0x00:
+      // All black! We are definitely lost here.  
+      throw idp::Robot::LineFollowingError();
+      break;
 
-      case 0x01:
-        // All black except the left sensor.  
-        x.value = 2;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
+    case 0x01:
+      // All black except the left sensor.  
+      x.value = 2;
+      x.ms = ms;
+      _control_loop.update(x);
+      break;
 
-      case 0x03:
-        // Left and center sensors are white
-        x.value = 1;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
+    case 0x02:
+      // Center sensor is white, we are right on target.  
+      x.value = 0;
+      x.ms = ms;
+      _control_loop.update(x);
+      break;
 
-      case 0x04:
-        // All black except the far right sensor.  
-        x.value = -2;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
+    case 0x03:
+      // Left and center sensors are white
+      x.value = 1;
+      x.ms = ms;
+      _control_loop.update(x);
+      break;
 
-      case 0x06:
-        // Right and center sensors are white
-        x.value = -1;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
+    case 0x04:
+      // All black except the far right sensor.  
+      x.value = -2;
+      x.ms = ms;
+      _control_loop.update(x);
+      break;
 
-      // Strange cases
-      case 0x05:
+    case 0x05:
+      if (!close_to_intersection) {
         IDP_ERR << "Position tracking says we are far from intersection but we read value " 
                   << std::hex << line_sensors << " from light sensor board." << std::endl;
         throw idp::Robot::PositionTrackingError();
-        break;
-
-      case 0x07:
+      }
+      else {
         IDP_WARN << "Robot is at an odd angle to line, starting recovery procedure." << std::endl;
         throw idp::Robot::LineFollowingError();
-        break;
-    }
-  }
+      }
+      break;
 
-  // Otherwise 
-  else {
-    switch (line_sensors bitand 0x07) {
-      case 0x00:
-        // All black! We are definitely lost here.  
+    case 0x06:
+      // Right and center sensors are white
+      x.value = -1;
+      x.ms = ms;
+      _control_loop.update(x);
+      break;
+
+    case 0x07:
+      if (!close_to_intersection) {
+        IDP_WARN << "Robot is at an odd angle to line, starting recovery procedure." << std::endl;
         throw idp::Robot::LineFollowingError();
-        break;
-
-      case 0x02:
-        // Center sensor is white, we are right on target.  
-        x.value = 0;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
-
-      case 0x07:
+      }
+      else {
         // We hit that intersection!!!
-        break;
-
-      case 0x01:
-        // All black except the left sensor.  
-        x.value = 2;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
-
-      case 0x03:
-        // Left and center sensors are white, but we might have hit an intersection... 
-        // One strategy would be to turn left and see whether it really is an intersection. 
-        // Then, if it is an intersection, we can expect all three light sensors to light up.  
-        x.value = 1;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
-
-      // Now the opposite: robot is at the left of the line (right sensors are white)
-      case 0x04:
-        // All black except the far right sensor.  
-        x.value = -2;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
-
-      case 0x06:
-        // Right and center sensors are white
-        x.value = -1;
-        x.ms = ms;
-        _control_loop.update(x);
-        break;
-
-      case 0x05:
-        // This is an odd way of hitting an intersection. Not quite sure yet what to do about it. 
-        break;
-    }
+        at_intersection = true;
+        IDP_INFO << "We have reached the intersection. " << std::endl;
+      }
+      break;
   }
+}
 
-  // Check if we are on a curved part of the playing area. If yes, then set _target_curvature to the default value
+void idp::Robot::tracking_analysis() {
+  // To be performed after line following tells us whether we have arrived at an intersection or not. 
+  
+}
 
-  // Else set _target_curvature to 0.
-
-  // This is supposed to be our "equilibrium" state.  
+idp::Robot::MotorDemand idp::Robot::calculate_demand() {
+  idp::Robot::MotorDemand motor_demand;
+  
   motor_demand.speed_l = _target_speed * (1 - _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
   motor_demand.speed_r = _target_speed * (1 + _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
 

@@ -16,7 +16,7 @@ public:
 };
 }
 
-#define IDP_ERR std::cout << std::setw(6) << idp::logging::logging_stopwatch.read() << "ERROR  :  "
+#define IDP_ERR std::cout << std::setw(6) << idp::logging::logging_stopwatch.read() << "ERROR:    "
 #define IDP_WARN std::cout << std::setw(6) << idp::logging::logging_stopwatch.read() << "WARNING:  "
 #define IDP_INFO std::cout << std::setw(6) << idp::logging::logging_stopwatch.read() << "INFO:     "
 

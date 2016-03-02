@@ -42,12 +42,13 @@ int main(int argc, char* argv[]) {
     }
     catch (idp::Robot::LineFollowingError& e) {
       // We're lost! Enter recovery mode now.  
-
+      IDP_ERR << "We lost the line. " << std::endl;
 
       // Don't forget to reset PID control loop before resuming line following.  
     }
     catch (idp::Robot::PositionTrackingError& e) {
       // Discrepancy between position tracking and another subsystem.  
+      IDP_ERR << "Discrepancy between position tracking and line following." << std::endl;
       // That's going to be really tricky to solve, UNLESS we are at a known intersection.  
     }
 
