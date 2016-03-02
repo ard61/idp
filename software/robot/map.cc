@@ -32,7 +32,7 @@ int idp::Map::populate(const char* map_file) {
 
   line_number++;
   ifs.getline(cur_line, 16);
-  if (std::string(cur_line) != "POINTS:\n") {
+  if (!strcmp(cur_line, "POINTS:")) {
     // Sanity check here
     IDP_ERR << "Error parsing playing area map file on line 1 ." << std::endl;
     return -1;
@@ -41,7 +41,7 @@ int idp::Map::populate(const char* map_file) {
   while (ifs.good()) {
     line_number++;
     ifs.getline(cur_line, 16);
-    if (std::string(cur_line) == "LINES:\n") are_dealing_with_points = false;
+    if (!strcmp(cur_line, "LINES:")) are_dealing_with_points = false;
 
     else if (are_dealing_with_points) {
       // Using the *HORRIBLE* std::strtok function, which is probably
