@@ -84,7 +84,7 @@ void idp::Robot::load_constants() {
 
 }
 
-int idp::Robot::initialise() {
+bool idp::Robot::initialise() {
   #ifndef __arm__
   int rc = _rlink.initialise(_constants.robot_num);
   #else
@@ -94,7 +94,7 @@ int idp::Robot::initialise() {
   if (!rc) { // setup the link
     IDP_ERR << "Cannot initialise link." << std::endl;
     _rlink.print_errs("    ");
-    return -1;
+    return false;
   }
 
   IDP_INFO << "Link initialisation complete." << std::endl;
@@ -104,19 +104,19 @@ int idp::Robot::initialise() {
 
   _map->populate(_constants.map_file.c_str());
 
-  return 0;
+  return true;
 }
 
-int idp::Robot::reinitialise() {
+bool idp::Robot::reinitialise() {
   if (!_rlink.reinitialise()) { // 
     IDP_ERR << "Could not reinitialise following link error." << std::endl;
     _rlink.print_errs("    ");
-    return -1;
+    return false;
   }
 
   IDP_INFO << "Link reinitialisation complete." << std::endl;
 
-  return 0;
+  return true;
 }
 
 void idp::Robot::configure() {
@@ -133,7 +133,7 @@ void idp::Robot::configure() {
   }
 }
 
-int idp::Robot::test() {
+bool idp::Robot::test() {
   stopwatch sw;
   int val;
   
@@ -146,7 +146,7 @@ int idp::Robot::test() {
   if (val == TEST_INSTRUCTION_RESULT) {     // check result
     IDP_INFO << "Test passed, " << "each test took on average " 
               << (double) etime/_constants.num_tests << " milliseconds." << std::endl;
-    return 0;
+    return true;
   }
   
   else {
@@ -154,10 +154,10 @@ int idp::Robot::test() {
     throw idp::Robot::LinkError();
   }
   
-  return -1;
+  return false;
 }
 
-int idp::Robot::move(const idp::Robot::MotorDemand &motor_demand) {
+void idp::Robot::move(const idp::Robot::MotorDemand &motor_demand) {
   // Preliminary bounds check
   if (motor_demand.speed_l > _constants.max_speed
       or motor_demand.speed_l < -_constants.max_speed) {
@@ -189,7 +189,6 @@ int idp::Robot::move(const idp::Robot::MotorDemand &motor_demand) {
     IDP_ERR << "Error occurred in sending command to motor. " << std::endl;
     throw idp::Robot::LinkError();
   }
-  return 0;
 }
 
 void idp::Robot::turn(const double angle, const double angular_velocity) {

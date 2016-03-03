@@ -167,10 +167,10 @@ public:
 
   // Initialisation
   void load_constants();
-  int initialise();
-  int reinitialise();
+  bool initialise();
+  bool reinitialise();
   void configure();
-  int test();
+  bool test();
 
   // Propulsion
   class MotorDemand {
@@ -183,7 +183,7 @@ public:
     double speed_r;
   }; // class MotorDemand
 
-  int move(const MotorDemand &motor_demand);
+  void move(const MotorDemand &motor_demand);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
 

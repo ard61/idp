@@ -8,6 +8,8 @@ stopwatch idp::logging::logging_stopwatch;
 int main(int argc, char* argv[]) {
   idp::logging::log_init();
   idp::Robot r;
+
+  IDP_INFO << "Program started." << std::endl;
   
   r.load_constants();
 
