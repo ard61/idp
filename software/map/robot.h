@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <exception>
+
+#define _USE_MATH_DEFINES
 #include <cmath>
 
 #include <robot_link.h>
@@ -36,6 +38,7 @@ public:
 
   double abs2() const {return x*x + y*y; }
   double abs() const {return sqrt(abs2()); }
+  double angle() const {return atan2(y, x); }
 
   static Vector2d from_polar(double r, double theta) {return Vector2d(r * cos(theta), r * sin(theta)); }
 
@@ -164,13 +167,35 @@ public:
       return "Position tracking does not match light sensor information.";
     }  
   };
+  
+  // Constants
+  struct Constants {
+    int robot_num;
+    int num_tests;
+    double half_axle_length; // in m
+    double max_speed_l; // in m/s
+    double max_speed_r;
+    std::string map_file;
+    int ramp_time;
+    double initial_position_x;
+    double initial_position_y;
+    double initial_orientation;
+    double curve_curvature;
+    double cruise_speed;
+    double control_loop_kp;
+    double control_loop_ki;
+    double control_loop_kd;
+    double control_loop_derivative_smoothing_coef;
+    double intersection_threshold_distance;
+    double go_blind_tolerance;
+  } _constants;
 
   // Initialisation
   void load_constants();
-  int initialise();
-  int reinitialise();
+  bool initialise();
+  bool reinitialise();
   void configure();
-  int test();
+  bool test();
 
   // Propulsion
   class MotorDemand {
@@ -183,7 +208,8 @@ public:
     double speed_r;
   }; // class MotorDemand
 
-  int move(const MotorDemand &motor_demand);
+  void move(MotorDemand motor_demand);
+  void move(MotorDemand motor_demand, double distance);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
 
@@ -219,6 +245,9 @@ public:
   void tracking_analysis();
   MotorDemand calculate_demand();
 
+  void go_blind_iter(Vector2d target_position);
+  void go_blind(Vector2d target_position);
+
   // Recovery
   void recovery();
 
@@ -238,26 +267,6 @@ private:
   // Robot interface
   robot_link _rlink;
 
-  // Constants, loaded from config file / command line
-  struct Constants {
-    int robot_num;
-    int num_tests;
-    double half_axle_length; // in m
-    double max_speed; // in m/s
-    std::string map_file;
-    int ramp_time;
-    double initial_position_x;
-    double initial_position_y;
-    double initial_orientation;
-    double curve_curvature;
-    double cruise_speed;
-    double control_loop_kp;
-    double control_loop_ki;
-    double control_loop_kd;
-    double control_loop_derivative_smoothing_coef;
-    double intersection_threshold_distance;
-  } _constants;
-
   // Line following
   // Sensor values
   LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
@@ -272,8 +281,9 @@ private:
   // Map
   Map *_map;
   // Extra position tracking from map.  
-  int current_line;
+  int current_line; // index of the line if we are on a line, but -1 if we are at an intersection.  
   int previous_point;
+  bool at_point;
 }; // class Robot
 
 } // namespace idp

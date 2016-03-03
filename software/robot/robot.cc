@@ -1,6 +1,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <delay.h>
+
 #include "logging.h"
 #include "robot.h"
 
@@ -54,16 +56,17 @@ void idp::Robot::load_constants() {
 
   // Propulsion
   _constants.half_axle_length = 0.15;  // half-axle length
-  _constants.max_speed_l = 0.11;  // maximum speed of left robot motor
-  _constants.max_speed_r = 0.2;  // maximum speed of right robot motor
+  _constants.max_speed_l = 0.02;  // maximum speed of left robot motor
+  _constants.max_speed_r = 0.04;  // maximum speed of right robot motor
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
-  _constants.cruise_speed = 0.05;  // Standard speed of the robot
+  _constants.cruise_speed = 0.015;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
 
   // Tracking
   _constants.initial_position_x = 0.1;  // Robot initial position, x-coordinate
   _constants.initial_position_y = 0.1;  // Robot initial position, y-coordinate
   _constants.initial_orientation = 0;  // Robot initial orientation
+  _constants.go_blind_tolerance = 0.02;
 
   // Line following
   _constants.control_loop_kp = -5;  // Proportional control loop coefficient, gives curvature as a function of error. 
@@ -210,6 +213,22 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   }
 }
 
+void idp::Robot::move(idp::Robot::MotorDemand motor_demand, double distance) {
+  int delta_t_ms = 2 * distance / (motor_demand.speed_l + motor_demand.speed_r) * 1000;
+  
+  idp::Robot::MotorDemand zero(0,0);
+
+  int current_ms = _sw.read();
+  move(motor_demand);
+
+  while (_sw.read() - current_ms < delta_t_ms - 10) { // 10 ms to account for lag
+    update_tracking();
+    delay(10);
+  }
+
+  move(zero);
+}
+
 void idp::Robot::turn(const double angle, const double angular_velocity) {
   int delta_t_ms = angle / angular_velocity * 1000;
 
@@ -223,7 +242,8 @@ void idp::Robot::turn(const double angle, const double angular_velocity) {
   move(motor_demand);
 
   while (_sw.read() - current_ms < delta_t_ms - 10) { // 10 ms to account for lag
-    // Do nothing
+    update_tracking();
+    delay(10);
   }
 
   move(zero);
@@ -269,6 +289,8 @@ void idp::Robot::update_tracking() {
   idp::Vector2d prev_position = _tracking_history->back().value.position;
 
   tracking.value.orientation = prev_orientation + delta_t * ((tracking.value.speed + prev_speed) / 2) * ((tracking.value.curvature + prev_curvature) / 2);
+  while (tracking.value.orientation < -M_PI) tracking.value.orientation += 2*M_PI;
+  while (tracking.value.orientation >= M_PI) tracking.value.orientation -= 2*M_PI;
   tracking.value.position = prev_position + delta_t * ((tracking.value.speed + prev_speed) / 2) * idp::Vector2d::from_polar(1, (tracking.value.orientation + prev_orientation) / 2);
 
   // Store into the _tracking data structure
@@ -378,9 +400,9 @@ void idp::Robot::tracking_analysis() {
   // To be performed after line following tells us whether we have arrived at an intersection or not. 
   if (at_intersection)
   {
-	if (current_line != -1) {
-		// We have just reached a new intersection.  Update the map state. 
-	}
+  	if (current_line != -1) {
+  		// We have just reached a new intersection.  Update the map state. 
+  	}
   }
 }
 
@@ -391,6 +413,24 @@ idp::Robot::MotorDemand idp::Robot::calculate_demand() {
   motor_demand.speed_r = _target_speed * (1 + _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
 
   return motor_demand;
+}
+
+void idp::Robot::go_blind(Vector2d target_position) {
+  double direction = (target_position - _tracking_history->back().value.position).angle();
+  double distance = (target_position - _tracking_history->back().value.position).abs();
+
+  double angle = direction - _tracking_history->back().value.orientation;
+  while (angle > M_PI) angle -= 2*M_PI;
+  while (angle <= -M_PI) angle += 2*M_PI;
+  turn(angle);
+  move(idp::Robot::MotorDemand(_constants.cruise_speed, _constants.cruise_speed), distance);
+}
+
+void idp::Robot::go_blind_iter(Vector2d target_position) {
+  // Iterates until we come close enough to the target position.
+  while ((target_position - _tracking_history->back().value.position).abs() > _constants.go_blind_tolerance) {
+    go_blind(target_position);
+  }
 }
 
 void idp::Robot::recovery() {

@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
   idp::Robot::MotorDemand motor_demand(r._constants.max_speed_l, r._constants.max_speed_l);
 
   try {
-    IDP_INFO << "Moving at maximum speed" << std::endl;
+    IDP_INFO << "Moving at maximum speed for 10 seconds." << std::endl;
     r.move(motor_demand);
     delay(10000);  // delay 10 seconds
 	r.move(idp::Robot::MotorDemand(0,0));

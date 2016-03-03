@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <exception>
+
+#define _USE_MATH_DEFINES
 #include <cmath>
 
 #include <robot_link.h>
@@ -36,6 +38,7 @@ public:
 
   double abs2() const {return x*x + y*y; }
   double abs() const {return sqrt(abs2()); }
+  double angle() const {return atan2(y, x); }
 
   static Vector2d from_polar(double r, double theta) {return Vector2d(r * cos(theta), r * sin(theta)); }
 
@@ -184,6 +187,7 @@ public:
     double control_loop_kd;
     double control_loop_derivative_smoothing_coef;
     double intersection_threshold_distance;
+    double go_blind_tolerance;
   } _constants;
 
   // Initialisation
@@ -205,6 +209,7 @@ public:
   }; // class MotorDemand
 
   void move(MotorDemand motor_demand);
+  void move(MotorDemand motor_demand, double distance);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
 
@@ -239,6 +244,9 @@ public:
   void line_sensor_analysis();
   void tracking_analysis();
   MotorDemand calculate_demand();
+
+  void go_blind_iter(Vector2d target_position);
+  void go_blind(Vector2d target_position);
 
   // Recovery
   void recovery();
