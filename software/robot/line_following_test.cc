@@ -20,8 +20,8 @@ int main(int argc, char* argv[]) {
     r.configure();
   }
   catch (idp::Robot::LinkError& e) {
-    IDP_ERR << "First configuration failed. Exiting." << std::endl;
-    return -1;
+    //IDP_ERR << "First configuration failed. Exiting." << std::endl;
+    //return -1;
   }
 
   try {

@@ -163,7 +163,7 @@ int idp::Map::populate(const char* map_file) {
   ifs.close();
 
   IDP_INFO << "Read " << points.size() << " points and "
-            << lines.size() << " lines from file." << std::endl;
+            << lines.size() << " lines from playing area map file." << std::endl;
  
   // WHEW!
   return 0;
