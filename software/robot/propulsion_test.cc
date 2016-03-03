@@ -37,11 +37,23 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  idp::Robot::MotorDemand motor_demand(r._constants.max_speed_l, r._constants.max_speed_l);
 
   try {
     IDP_INFO << "Moving at maximum speed for 10 seconds." << std::endl;
-    r.move(motor_demand);
+    r.move(idp::Robot::MotorDemand(r._constants.max_speed_l, r._constants.max_speed_l));
+    delay(10000);  // delay 10 seconds
+	r.move(idp::Robot::MotorDemand(0,0));
+	
+	IDP_INFO << "Rotating 90 degrees anticlockwise." << std::endl;
+	r.turn(M_PI/2);
+	
+	delay(2000);
+	
+	IDP_INFO << "Rotating 90 degrees clockwise." << std::endl;
+	r.turn(-M_PI/2);
+	
+	IDP_INFO << "Reversing at maximum speed for 10 seconds." << std::endl;
+    r.move(idp::Robot::MotorDemand(-r._constants.max_speed_l, -r._constants.max_speed_l));
     delay(10000);  // delay 10 seconds
 	r.move(idp::Robot::MotorDemand(0,0));
   }

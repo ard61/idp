@@ -20,8 +20,8 @@ int main(int argc, char* argv[]) {
     r.configure();
   }
   catch (idp::Robot::LinkError& e) {
-    //IDP_ERR << "First configuration failed. Exiting." << std::endl;
-    //return -1;
+    IDP_ERR << "First configuration failed. Exiting." << std::endl;
+    return -1;
   }
 
   try {
@@ -31,9 +31,12 @@ int main(int argc, char* argv[]) {
     IDP_ERR << "Preliminary test failed. Exiting." << std::endl;
     return -1;
   }
+  
+  stopwatch test_stopwatch;
+  test_stopwatch.start();
 
   // Main loop here.
-  while (true) {
+  while (test_stopwatch.read() < 40000) {
     try {  // Normal line-following regime.
       r.update_tracking();
       r.update_light_sensors();
@@ -45,6 +48,8 @@ int main(int argc, char* argv[]) {
     catch (idp::Robot::LineFollowingError& e) {
       // We're lost! Enter recovery mode now.  
       IDP_ERR << "We lost the line. " << std::endl;
+      r.move(idp::Robot::MotorDemand(0, 0));
+      return -1;
 
       // Don't forget to reset PID control loop before resuming line following.  
     }

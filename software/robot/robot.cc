@@ -21,10 +21,11 @@ void idp::PIDControlLoop::update(const idp::Timestamp<double> error) {
     return;
   }
 
-  // Otherwise: 
-  int dt = error.ms - _ms;
-  _ierror += error.value * dt;
-  _derror = _derivative_smoothing_coef * (error.value - _error) / dt + (1 - _derivative_smoothing_coef) * _derror;
+  // Otherwise:
+  double dt = error.ms - _ms;
+  double derivative_coef = exp(-_derivative_smoothing_coef * dt / 1000);
+  _ierror += error.value * dt/1000;
+  _derror = derivative_coef * (error.value - _error) / dt*1000 + (1 - derivative_coef) * _derror;
   _error = error.value;
   _ms = error.ms;
 }
@@ -56,10 +57,10 @@ void idp::Robot::load_constants() {
 
   // Propulsion
   _constants.half_axle_length = 0.15;  // half-axle length
-  _constants.max_speed_l = 0.02;  // maximum speed of left robot motor
-  _constants.max_speed_r = 0.04;  // maximum speed of right robot motor
+  _constants.max_speed_l = 0.064;  // maximum speed of left robot motor
+  _constants.max_speed_r = 0.135;  // maximum speed of right robot motor
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
-  _constants.cruise_speed = 0.015;  // Standard speed of the robot
+  _constants.cruise_speed = 0.05;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
 
   // Tracking
@@ -69,10 +70,11 @@ void idp::Robot::load_constants() {
   _constants.go_blind_tolerance = 0.02;
 
   // Line following
-  _constants.control_loop_kp = -5;  // Proportional control loop coefficient, gives curvature as a function of error. 
-  _constants.control_loop_ki = 0;  // Integral control loop coefficient
+  // PID coefficients determined using Ziegler-Nichols method.  
+  _constants.control_loop_kp = 0.9;  // Proportional control loop coefficient, gives curvature as a function of error. 
+  _constants.control_loop_ki = 0.216;  // Integral control loop coefficient
   _constants.control_loop_kd = 0;  // Derivative control loop coefficient
-  _constants.control_loop_derivative_smoothing_coef = 0.8;  // Control loop derivative smoothing coefficient
+  _constants.control_loop_derivative_smoothing_coef = 100;  // Control loop derivative smoothing coefficient.  0 means no smoothing.  Larger values mean more smoothing.  
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
 
 
@@ -167,20 +169,24 @@ bool idp::Robot::test() {
 void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   // Preliminary bounds check
   if (motor_demand.speed_l > _constants.max_speed_l) {
+	  motor_demand.speed_r *= _constants.max_speed_l / motor_demand.speed_l;
 	  motor_demand.speed_l = _constants.max_speed_l;
-	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+	  IDP_WARN << "Motor demand egg-ceded max speed, scaled down." << std::endl;
   }
   if (motor_demand.speed_r > _constants.max_speed_r) {
+	  motor_demand.speed_l *= _constants.max_speed_r / motor_demand.speed_r;
 	  motor_demand.speed_r = _constants.max_speed_r;
-	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+	  IDP_WARN << "Motor demand egg-ceded max speed, scaled down." << std::endl;
   }
   if (motor_demand.speed_l < -_constants.max_speed_l) {
-	  motor_demand.speed_l = -_constants.max_speed_l;
-	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+	  motor_demand.speed_r *= _constants.max_speed_l / motor_demand.speed_l;
+      motor_demand.speed_l = -_constants.max_speed_l;
+	  IDP_WARN << "Motor demand egg-ceded max speed, scaled down." << std::endl;
   }
   if (motor_demand.speed_r < -_constants.max_speed_r) {
+	  motor_demand.speed_l *= _constants.max_speed_r / motor_demand.speed_r;
 	  motor_demand.speed_r = -_constants.max_speed_r;
-	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+	  IDP_WARN << "Motor demand egg-ceded max speed, scaled down." << std::endl;
   }
 
   // TODO: Put negative signs here if needed when final motor orientation becomes known
@@ -230,9 +236,19 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand, double distance) {
 }
 
 void idp::Robot::turn(const double angle, const double angular_velocity) {
-  int delta_t_ms = angle / angular_velocity * 1000;
+  int delta_t_ms;
+  double speed;
+  if (angle*angular_velocity >= 0) {
+    delta_t_ms = angle / angular_velocity * 1000;
+    speed = angular_velocity * _constants.half_axle_length;
+  }
+  else {
+    delta_t_ms = -angle / angular_velocity * 1000;
+    speed = -angular_velocity * _constants.half_axle_length;
+  }
 
-  double speed = angular_velocity * _constants.half_axle_length;
+  IDP_INFO << "Turning " << angle << " radians means setting each motor at a speed of "
+           << speed << " m/s for " << (double)(delta_t_ms)/1000.0 << " seconds." << std::endl;
 
   // If angular velocity is positive (anticlockwise), then left motor should go backwards.  
   idp::Robot::MotorDemand motor_demand(-speed, speed);

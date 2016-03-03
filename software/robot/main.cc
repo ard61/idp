@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include <delay.h>
 #include "logging.h"
 #include "robot.h"
 
