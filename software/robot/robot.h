@@ -164,6 +164,27 @@ public:
       return "Position tracking does not match light sensor information.";
     }  
   };
+  
+  // Constants
+  struct Constants {
+    int robot_num;
+    int num_tests;
+    double half_axle_length; // in m
+    double max_speed_l; // in m/s
+    double max_speed_r;
+    std::string map_file;
+    int ramp_time;
+    double initial_position_x;
+    double initial_position_y;
+    double initial_orientation;
+    double curve_curvature;
+    double cruise_speed;
+    double control_loop_kp;
+    double control_loop_ki;
+    double control_loop_kd;
+    double control_loop_derivative_smoothing_coef;
+    double intersection_threshold_distance;
+  } _constants;
 
   // Initialisation
   void load_constants();
@@ -183,7 +204,7 @@ public:
     double speed_r;
   }; // class MotorDemand
 
-  void move(const MotorDemand &motor_demand);
+  void move(MotorDemand motor_demand);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
 
@@ -238,26 +259,6 @@ private:
   // Robot interface
   robot_link _rlink;
 
-  // Constants, loaded from config file / command line
-  struct Constants {
-    int robot_num;
-    int num_tests;
-    double half_axle_length; // in m
-    double max_speed; // in m/s
-    std::string map_file;
-    int ramp_time;
-    double initial_position_x;
-    double initial_position_y;
-    double initial_orientation;
-    double curve_curvature;
-    double cruise_speed;
-    double control_loop_kp;
-    double control_loop_ki;
-    double control_loop_kd;
-    double control_loop_derivative_smoothing_coef;
-    double intersection_threshold_distance;
-  } _constants;
-
   // Line following
   // Sensor values
   LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
@@ -272,7 +273,7 @@ private:
   // Map
   Map *_map;
   // Extra position tracking from map.  
-  int current_line;
+  int current_line; // index of the line if we are on a line, but -1 if we are at an intersection.  
   int previous_point;
   bool at_point;
 }; // class Robot

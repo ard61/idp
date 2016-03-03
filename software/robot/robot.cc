@@ -53,8 +53,9 @@ void idp::Robot::load_constants() {
   _constants.num_tests = 100;  // Number of tests in each test command
 
   // Propulsion
-  _constants.half_axle_length = 10.0;  // half-axle length
-  _constants.max_speed = 0.2;  // maximum speed of robot
+  _constants.half_axle_length = 0.15;  // half-axle length
+  _constants.max_speed_l = 0.11;  // maximum speed of left robot motor
+  _constants.max_speed_r = 0.2;  // maximum speed of right robot motor
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
   _constants.cruise_speed = 0.05;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
@@ -65,7 +66,7 @@ void idp::Robot::load_constants() {
   _constants.initial_orientation = 0;  // Robot initial orientation
 
   // Line following
-  _constants.control_loop_kp = 5;  // Proportional control loop coefficient
+  _constants.control_loop_kp = -5;  // Proportional control loop coefficient, gives curvature as a function of error. 
   _constants.control_loop_ki = 0;  // Integral control loop coefficient
   _constants.control_loop_kd = 0;  // Derivative control loop coefficient
   _constants.control_loop_derivative_smoothing_coef = 0.8;  // Control loop derivative smoothing coefficient
@@ -81,7 +82,7 @@ void idp::Robot::load_constants() {
   tracking.value.orientation = _constants.initial_orientation;
 
   _tracking_history->push_back(tracking);
-
+  
   _control_loop.initialise(_constants.control_loop_kp, _constants.control_loop_ki, 
                            _constants.control_loop_kd, _constants.control_loop_derivative_smoothing_coef);
 
@@ -89,6 +90,7 @@ void idp::Robot::load_constants() {
 
   _target_curvature = 0;
   _target_speed = _constants.cruise_speed;
+
 }
 
 bool idp::Robot::initialise() {
@@ -159,22 +161,34 @@ bool idp::Robot::test() {
   return false;
 }
 
-void idp::Robot::move(const idp::Robot::MotorDemand &motor_demand) {
+void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   // Preliminary bounds check
-  if (motor_demand.speed_l > _constants.max_speed
-      or motor_demand.speed_l < -_constants.max_speed) {
-    IDP_WARN << "An error occured during preliminary test." << std::endl;
+  if (motor_demand.speed_l > _constants.max_speed_l) {
+	  motor_demand.speed_l = _constants.max_speed_l;
+	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+  }
+  if (motor_demand.speed_r > _constants.max_speed_r) {
+	  motor_demand.speed_r = _constants.max_speed_r;
+	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+  }
+  if (motor_demand.speed_l < -_constants.max_speed_l) {
+	  motor_demand.speed_l = -_constants.max_speed_l;
+	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
+  }
+  if (motor_demand.speed_r < -_constants.max_speed_r) {
+	  motor_demand.speed_r = -_constants.max_speed_r;
+	  IDP_WARN << "Truncated motor demand to max speed." << std::endl;
   }
 
   // TODO: Put negative signs here if needed when final motor orientation becomes known
-  int motor1_demand = 128 * motor_demand.speed_l / _constants.max_speed;
-  int motor2_demand = 128 * motor_demand.speed_r / _constants.max_speed;
+  int motor1_demand = 127 * motor_demand.speed_l / _constants.max_speed_l;  // Between -127 and 127.
+  int motor2_demand = 127 * motor_demand.speed_r / _constants.max_speed_r;
 
   unsigned char speed_l, speed_r;
-  if (motor1_demand > 0) speed_l = motor1_demand;
+  if (motor1_demand >= 0) speed_l = motor1_demand;
   else speed_l = 128 - motor1_demand;
 
-  if (motor2_demand > 0) speed_r = motor2_demand;
+  if (motor2_demand >= 0) speed_r = motor2_demand;
   else speed_r = 128 - motor2_demand;
 
   /*
@@ -186,7 +200,10 @@ void idp::Robot::move(const idp::Robot::MotorDemand &motor_demand) {
   MOTOR_4 -> yellow
   */
   
-  if (!_rlink.command(MOTOR_1_GO, speed_l)
+  IDP_INFO << "Sending command to motor 4: " << (int)speed_l << std::endl;
+  IDP_INFO << "Sending command to motor 2: " << (int)speed_r << std::endl;
+  
+  if (!_rlink.command(MOTOR_4_GO, speed_l)
       or !_rlink.command(MOTOR_2_GO, speed_r)) {
     IDP_ERR << "Error occurred in sending command to motor. " << std::endl;
     throw idp::Robot::LinkError();
@@ -237,8 +254,8 @@ void idp::Robot::update_tracking() {
   // TODO: Adjust this when final robot orientation is known
   speed_1 = -speed_1;
 
-  double speed_l = idp::Robot::_constants.max_speed / 128 * speed_1;
-  double speed_r = idp::Robot::_constants.max_speed / 128 * speed_2;
+  double speed_l = idp::Robot::_constants.max_speed_l / 128 * speed_1;
+  double speed_r = idp::Robot::_constants.max_speed_r / 128 * speed_2;
 
   // Calculate new speed, curvature, position and orientation using second-order Euler integrator
   tracking.value.speed = (speed_l + speed_r) / 2;
@@ -287,11 +304,13 @@ void idp::Robot::line_sensor_analysis() {
   switch (line_sensors bitand 0x07) { // ignore rear sensor now
     case 0x00:
       // All black! We are definitely lost here.  
+      IDP_INFO << "All black." << std::endl;
       throw idp::Robot::LineFollowingError();
       break;
 
     case 0x01:
       // All black except the left sensor.  
+      IDP_INFO << "All black except left sensor" << std::endl;
       x.value = 2;
       x.ms = ms;
       _control_loop.update(x);
@@ -299,6 +318,7 @@ void idp::Robot::line_sensor_analysis() {
 
     case 0x02:
       // Center sensor is white, we are right on target.  
+      IDP_INFO << "All black except middle sensor" << std::endl;
       x.value = 0;
       x.ms = ms;
       _control_loop.update(x);
@@ -306,6 +326,7 @@ void idp::Robot::line_sensor_analysis() {
 
     case 0x03:
       // Left and center sensors are white
+      IDP_INFO << "Left and center sensors are white" << std::endl;
       x.value = 1;
       x.ms = ms;
       _control_loop.update(x);
@@ -313,6 +334,7 @@ void idp::Robot::line_sensor_analysis() {
 
     case 0x04:
       // All black except the far right sensor.  
+      IDP_INFO << "Far right sensor is white" << std::endl;
       x.value = -2;
       x.ms = ms;
       _control_loop.update(x);
@@ -332,6 +354,7 @@ void idp::Robot::line_sensor_analysis() {
 
     case 0x06:
       // Right and center sensors are white
+      IDP_INFO << "Right and center sensors are white" << std::endl;
       x.value = -1;
       x.ms = ms;
       _control_loop.update(x);
@@ -353,7 +376,12 @@ void idp::Robot::line_sensor_analysis() {
 
 void idp::Robot::tracking_analysis() {
   // To be performed after line following tells us whether we have arrived at an intersection or not. 
-  
+  if (at_intersection)
+  {
+	if (current_line != -1) {
+		// We have just reached a new intersection.  Update the map state. 
+	}
+  }
 }
 
 idp::Robot::MotorDemand idp::Robot::calculate_demand() {

@@ -10,7 +10,11 @@ int main(int argc, char* argv[]) {
   idp::logging::log_init();
   idp::Robot r;
   
+  IDP_INFO << "Loading constants." << std::endl;
+  
   r.load_constants();
+  
+  IDP_INFO << "Done loading constants." << std::endl;
 
   if (!r.initialise()) {
     IDP_ERR << "Unable to connect to robot. Exiting." << std::endl;
@@ -33,14 +37,13 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  idp::Robot::MotorDemand motor_demand(0.05, 0.05);
+  idp::Robot::MotorDemand motor_demand(r._constants.max_speed_l, r._constants.max_speed_l);
 
   try {
-    IDP_INFO << "Moving at speed of 0.05 m/s" << std::endl;
+    IDP_INFO << "Moving at maximum speed" << std::endl;
     r.move(motor_demand);
     delay(10000);  // delay 10 seconds
-    IDP_INFO << "Turning 90 degrees anticlockwise" << std::endl;
-    r.turn(3.1415/4);
+	r.move(idp::Robot::MotorDemand(0,0));
   }
   catch (idp::Robot::LinkError& e) {
     // Something's gone wrong with the link.  
