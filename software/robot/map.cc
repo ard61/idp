@@ -59,7 +59,7 @@ int idp::Map::populate(const char* map_file) {
         strncpy(current_point.name, strtok_return, 2);
         current_point.name[2] = '\0';
       }
-      else { 
+      else {
         error = true;
       }
 
