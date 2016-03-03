@@ -274,6 +274,7 @@ private:
   // Extra position tracking from map.  
   int current_line;
   int previous_point;
+  bool at_point;
 }; // class Robot
 
 } // namespace idp

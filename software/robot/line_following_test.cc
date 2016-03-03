@@ -37,6 +37,8 @@ int main(int argc, char* argv[]) {
     try {  // Normal line-following regime.
       r.update_tracking();
       r.update_light_sensors();
+      r.line_sensor_analysis();
+      r.tracking_analysis();
       r.move(r.calculate_demand());
 
     }

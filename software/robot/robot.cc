@@ -70,7 +70,7 @@ void idp::Robot::load_constants() {
   _constants.control_loop_kd = 0;  // Derivative control loop coefficient
   _constants.control_loop_derivative_smoothing_coef = 0.8;  // Control loop derivative smoothing coefficient
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
-  ;
+
 
   // Put the first value of position and speed in the _tracking_history data structure
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -82,6 +82,13 @@ void idp::Robot::load_constants() {
 
   _tracking_history->push_back(tracking);
 
+  _control_loop.initialise(_constants.control_loop_kp, _constants.control_loop_ki, 
+                           _constants.control_loop_kd, _constants.control_loop_derivative_smoothing_coef);
+
+  _map->populate(_constants.map_file.c_str());
+
+  _target_curvature = 0;
+  _target_speed = _constants.cruise_speed;
 }
 
 bool idp::Robot::initialise() {
@@ -98,11 +105,6 @@ bool idp::Robot::initialise() {
   }
 
   IDP_INFO << "Link initialisation complete." << std::endl;
-
-  _control_loop.initialise(_constants.control_loop_kp, _constants.control_loop_ki, 
-                           _constants.control_loop_kd, _constants.control_loop_derivative_smoothing_coef);
-
-  _map->populate(_constants.map_file.c_str());
 
   return true;
 }
