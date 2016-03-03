@@ -9,7 +9,7 @@ ARM_CFLAGS=-c -ansi -Wall -g -I/export/teach/1BRobot -I/usr/arm-unknown-linux-gn
 LDFLAGS=-L/export/teach/1BRobot -lrobot
 ARM_LDFLAGS=-L/usr/arm-unknown-linux-gnueabi/lib -lrobot
 
-SOURCES=main.cc robot.cc map.cc robot.h logging.h
+SOURCES=main.cc robot.cc map.cc robot.h logging.h line_following_test.cc propulsion_test.cc
 
 OBJECTS=main.o robot.o map.o
 ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
@@ -17,7 +17,7 @@ ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
 EXECUTABLE=robot
 ARM_EXECUTABLE=robot.arm
 
-all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm
+all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm propulsion_test propulsion_test.arm
 
 clean:
 	rm -f *.o
@@ -34,6 +34,12 @@ line_following_test: line_following_test.o robot.o map.o
 line_following_test.arm: line_following_test_arm.o robot_arm.o map_arm.o
 	$(ARM_CC) line_following_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
 
+propulsion_test: propulsion_test.o robot.o map.o
+	$(CC) propulsion_test.o robot.o map.o -o $@ $(LDFLAGS)
+
+propulsion_test.arm: propulsion_test_arm.o robot_arm.o map_arm.o
+	$(ARM_CC) propulsion_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
+
 main.o: main.cc robot.h logging.h
 	$(CC) $(CFLAGS) main.cc -o $@
 
@@ -46,6 +52,9 @@ map.o: map.cc robot.h logging.h
 line_following_test.o: line_following_test.cc robot.h logging.h
 	$(CC) $(CFLAGS) line_following_test.cc -o $@
 
+propulsion_test.o: propulsion_test.cc robot.h logging.h
+	$(CC) $(CFLAGS) propulsion_test.cc -o $@
+
 main_arm.o: main.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) main.cc -o $@
 
@@ -57,3 +66,6 @@ map_arm.o: map.cc robot.h logging.h
 
 line_following_test_arm.o: line_following_test.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) line_following_test.cc -o $@
+
+propulsion_test_arm.o: propulsion_test.cc robot.h logging.h
+	$(ARM_CC) $(ARM_CFLAGS) propulsion_test.cc -o $@

@@ -56,7 +56,7 @@ void idp::Robot::load_constants() {
   _constants.half_axle_length = 10.0;  // half-axle length
   _constants.max_speed = 0.2;  // maximum speed of robot
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
-  _constants.cruise_speed = 0.03;  // Standard speed of the robot
+  _constants.cruise_speed = 0.05;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
 
   // Tracking
