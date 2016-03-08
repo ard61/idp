@@ -34,7 +34,7 @@ double idp::PIDControlLoop::get_demand() const {
   return _k_p * _error + _k_i * _ierror + _k_d * _derror;
 }
 
-idp::Robot::Robot() {
+idp::Robot::Robot() : actuator1_is_on(false), actuator2_is_on(false) {
   _sw.start();
 
   _light_sensors_history = new LightSensorsHistory();
@@ -71,8 +71,8 @@ void idp::Robot::load_constants() {
 
   // Line following
   // PID coefficients determined using Ziegler-Nichols method.  
-  _constants.control_loop_kp = 0.9;  // Proportional control loop coefficient, gives curvature as a function of error. 
-  _constants.control_loop_ki = 0.216;  // Integral control loop coefficient
+  _constants.control_loop_kp = 1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
+  _constants.control_loop_ki = 0;  // Integral control loop coefficient
   _constants.control_loop_kd = 0;  // Derivative control loop coefficient
   _constants.control_loop_derivative_smoothing_coef = 100;  // Control loop derivative smoothing coefficient.  0 means no smoothing.  Larger values mean more smoothing.  
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
@@ -140,6 +140,9 @@ void idp::Robot::configure() {
     IDP_ERR << "Could not set up I2C bus to read from light sensor board." << std::endl;
     throw idp::Robot::LinkError();
   }
+  
+  actuator1_off();
+  actuator2_off();
 }
 
 bool idp::Robot::test() {
@@ -451,4 +454,68 @@ void idp::Robot::go_blind_iter(Vector2d target_position) {
 
 void idp::Robot::recovery() {
   // First we need to know which line we are on
+}
+
+void idp::Robot::actuator1_on() {
+  if (actuator2_is_on) {
+    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_2, 0x40)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  actuator1_is_on = true;
+}
+
+void idp::Robot::actuator1_off() {
+  if (actuator2_is_on) {
+    if (!_rlink.command(WRITE_PORT_2, 0x80)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  actuator1_is_on = false;
+}
+
+void idp::Robot::actuator2_on() {
+  if (actuator1_is_on) {
+    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_2, 0x80)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  actuator2_is_on = true;
+}
+
+void idp::Robot::actuator2_off() {
+  if (actuator1_is_on) {
+    if (!_rlink.command(WRITE_PORT_2, 0x40)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
+      IDP_ERR << "Could not send command to actuator board" << std::endl;
+      throw idp::Robot::ActuatorError();
+    }
+  }
+  actuator2_is_on = false;
 }

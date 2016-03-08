@@ -2,6 +2,7 @@
 
 #include "logging.h"
 #include "robot.h"
+#include <delay.h>
 
 stopwatch idp::logging::logging_stopwatch;
 
@@ -37,28 +38,24 @@ int main(int argc, char* argv[]) {
 
   // Main loop here.
   try {  // Normal line-following regime.
-    while (!r.at_intersection) {
-      r.update_tracking();
-      r.update_light_sensors();
-      r.line_sensor_analysis();
-      r.tracking_analysis();
-      r.move(r.calculate_demand());
-    }
-    IDP_INFO << "Rotating 90 degrees clockwise." << std::endl;
-	r.turn(-M_PI/2);
+    IDP_INFO << "Turning actuator 1 on" << std::endl;
+    r.actuator1_on();
+    delay(1000);
+    
+    IDP_INFO << "Turning actuator 2 on" << std::endl;
+    r.actuator2_on();
+    delay(1000);
+    
+    IDP_INFO << "Turning actuator 1 off" << std::endl;
+    r.actuator1_off();
+    delay(1000);
+    
+    IDP_INFO << "Turning actuator 2 off" << std::endl;
+    r.actuator2_off();
   }
-  catch (idp::Robot::LineFollowingError& e) {
-    // We're lost! Enter recovery mode now.  
-    IDP_ERR << "We lost the line. " << std::endl;
-    r.move(idp::Robot::MotorDemand(0, 0));
-    return -1;
-
-    // Don't forget to reset PID control loop before resuming line following.  
-  }
-  catch (idp::Robot::PositionTrackingError& e) {
-    // Discrepancy between position tracking and another subsystem.  
-    IDP_ERR << "Discrepancy between position tracking and line following." << std::endl;
-    // That's going to be really tricky to solve, UNLESS we are at a known intersection.  
+  catch (idp::Robot::ActuatorError& e) {
+    
+    
   }
 
   catch (idp::Robot::LinkError& e) {

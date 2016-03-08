@@ -167,6 +167,13 @@ public:
       return "Position tracking does not match light sensor information.";
     }  
   };
+
+  class ActuatorError : public std::exception {
+    virtual const char* what() const throw()
+    {
+      return "Could not send command to actuator circuit.";
+    }  
+  };
   
   // Constants
   struct Constants {
@@ -244,6 +251,7 @@ public:
   void line_sensor_analysis();
   void tracking_analysis();
   MotorDemand calculate_demand();
+  bool at_intersection;
 
   void go_blind_iter(Vector2d target_position);
   void go_blind(Vector2d target_position);
@@ -252,6 +260,10 @@ public:
   void recovery();
 
   // Egg processing
+  void actuator1_on();
+  void actuator1_off();
+  void actuator2_on();
+  void actuator2_off();
   void pickup_egg();
   int identify_egg();
   void crack_egg();
@@ -272,7 +284,6 @@ private:
   LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
   double _target_curvature; // in m^(-1), positive if turning to the left (anticlockwise when going forward)
   double _target_speed;
-  bool at_intersection;
   PIDControlLoop _control_loop;
 
   // Velocity and position tracking:
@@ -284,6 +295,9 @@ private:
   int current_line; // index of the line if we are on a line, but -1 if we are at an intersection.  
   int previous_point;
   bool at_point;
+  
+  bool actuator1_is_on;
+  bool actuator2_is_on;
 }; // class Robot
 
 } // namespace idp
