@@ -8,7 +8,7 @@
 int main(int argc, char* argv[]) {
   robot_link rlink;
   int rc;
-  const int DELAY_MSECS = 1000;
+  const int DELAY_MSECS = 5000;
   const command_instruction instruction_array[8] = {MOTOR_1_GO, MOTOR_2_GO, MOTOR_3_GO, MOTOR_4_GO};
 
   #ifdef __arm__
