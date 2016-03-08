@@ -189,12 +189,11 @@ public:
     double initial_orientation;
     double curve_curvature;
     double cruise_speed;
-    double control_loop_kp;
-    double control_loop_ki;
-    double control_loop_kd;
-    double control_loop_derivative_smoothing_coef;
+    double line_following_kp;
     double intersection_threshold_distance;
     double go_blind_tolerance;
+    double turn_until_line_max_angle;
+    double turn_until_line_threshold_angle;
   } _constants;
 
   // Initialisation
@@ -219,6 +218,8 @@ public:
   void move(MotorDemand motor_demand, double distance);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
+  void turn_until_line(bool anticlockwise, const double threshold_angle, const double max_angle, const double angular_velocity);
+  void turn_until_line(bool anticlockwise);
 
   // Position tracking
   void update_tracking();
@@ -232,26 +233,29 @@ public:
   typedef std::vector<Timestamp<Tracking> > TrackingHistory;
 
   // Line following
-  union LightSensors {
-    struct values { // 0 means white, 1 means black
+  struct LightSensorValues { // 0 means white, 1 means black
       unsigned int front_left : 1;
-      unsigned int front_center : 1;
       unsigned int front_right : 1;
-      unsigned int rear_right : 1;
-      unsigned int _padding : 2;
       unsigned int egg_sensor : 1;
       unsigned int content_sensor : 1;
-    };
+      unsigned int _padding : 2;
+      unsigned int front_centre : 1;
+      unsigned int rear : 1;
+  };
+  union LightSensors {
+    LightSensorValues values;
     unsigned int cat;
   }; // union LightSensors
 
   typedef std::vector<Timestamp<LightSensors> > LightSensorsHistory;
 
   void update_light_sensors();
-  void line_sensor_analysis();
+  void line_following();
   void tracking_analysis();
-  MotorDemand calculate_demand();
+  MotorDemand calculate_demand(double error);
   bool at_intersection;
+  
+  bool hit_line();
 
   void go_blind_iter(Vector2d target_position);
   void go_blind(Vector2d target_position);
@@ -282,8 +286,6 @@ private:
   // Line following
   // Sensor values
   LightSensorsHistory *_light_sensors_history;  // Will be dynamically allocated
-  double _target_curvature; // in m^(-1), positive if turning to the left (anticlockwise when going forward)
-  double _target_speed;
   PIDControlLoop _control_loop;
 
   // Velocity and position tracking:

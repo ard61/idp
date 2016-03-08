@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
   }
   catch (idp::Robot::LinkError& e) {
     IDP_ERR << "First configuration failed. Exiting." << std::endl;
-    return -1;
+    //return -1;
   }
 
   try {

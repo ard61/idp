@@ -6,33 +6,6 @@
 #include "logging.h"
 #include "robot.h"
 
-void idp::PIDControlLoop::initialise(const double k_p, const double k_i, const double k_d, const double derivative_smoothing_coef) {
-  _k_p = k_p;
-  _k_i = k_i;
-  _k_d = k_d;
-  _derivative_smoothing_coef = derivative_smoothing_coef;
-}
-
-void idp::PIDControlLoop::update(const idp::Timestamp<double> error) {
-  if (_ms == 0) { // This is the first value input to control loop. 
-    _error = error.value;
-    _ierror = error.value;
-    _ms = error.ms;
-    return;
-  }
-
-  // Otherwise:
-  double dt = error.ms - _ms;
-  double derivative_coef = exp(-_derivative_smoothing_coef * dt / 1000);
-  _ierror += error.value * dt/1000;
-  _derror = derivative_coef * (error.value - _error) / dt*1000 + (1 - derivative_coef) * _derror;
-  _error = error.value;
-  _ms = error.ms;
-}
-
-double idp::PIDControlLoop::get_demand() const {
-  return _k_p * _error + _k_i * _ierror + _k_d * _derror;
-}
 
 idp::Robot::Robot() : actuator1_is_on(false), actuator2_is_on(false) {
   _sw.start();
@@ -57,12 +30,14 @@ void idp::Robot::load_constants() {
 
   // Propulsion
   _constants.half_axle_length = 0.15;  // half-axle length
-  _constants.max_speed_l = 0.064;  // maximum speed of left robot motor
+  _constants.max_speed_l = 0.135;  // maximum speed of left robot motor
   _constants.max_speed_r = 0.135;  // maximum speed of right robot motor
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
   _constants.cruise_speed = 0.05;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
-
+  _constants.turn_until_line_threshold_angle = 0.25;  // Threshold angle after which the robot will start detecting for a new intersection.
+  _constants.turn_until_line_max_angle = M_PI/2;  // Default max. angle the robot will turn through if it does not hit a white line.  Prevents infinite 360 deg. turns.
+  
   // Tracking
   _constants.initial_position_x = 0.1;  // Robot initial position, x-coordinate
   _constants.initial_position_y = 0.1;  // Robot initial position, y-coordinate
@@ -71,12 +46,8 @@ void idp::Robot::load_constants() {
 
   // Line following
   // PID coefficients determined using Ziegler-Nichols method.  
-  _constants.control_loop_kp = 1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
-  _constants.control_loop_ki = 0;  // Integral control loop coefficient
-  _constants.control_loop_kd = 0;  // Derivative control loop coefficient
-  _constants.control_loop_derivative_smoothing_coef = 100;  // Control loop derivative smoothing coefficient.  0 means no smoothing.  Larger values mean more smoothing.  
+  _constants.line_following_kp = -1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
-
 
   // Put the first value of position and speed in the _tracking_history data structure
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -88,14 +59,7 @@ void idp::Robot::load_constants() {
 
   _tracking_history->push_back(tracking);
   
-  _control_loop.initialise(_constants.control_loop_kp, _constants.control_loop_ki, 
-                           _constants.control_loop_kd, _constants.control_loop_derivative_smoothing_coef);
-
   _map->populate(_constants.map_file.c_str());
-
-  _target_curvature = 0;
-  _target_speed = _constants.cruise_speed;
-
 }
 
 bool idp::Robot::initialise() {
@@ -143,6 +107,10 @@ void idp::Robot::configure() {
   
   actuator1_off();
   actuator2_off();
+  
+  // Take initial sensor readings from light sensors to start populating history. 
+  update_light_sensors();
+  update_light_sensors();
 }
 
 bool idp::Robot::test() {
@@ -212,10 +180,10 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   MOTOR_4 -> yellow
   */
   
-  IDP_INFO << "Sending command to motor 4: " << (int)speed_l << std::endl;
+  IDP_INFO << "Sending command to motor 3: " << (int)speed_l << std::endl;
   IDP_INFO << "Sending command to motor 2: " << (int)speed_r << std::endl;
   
-  if (!_rlink.command(MOTOR_4_GO, speed_l)
+  if (!_rlink.command(MOTOR_3_GO, speed_l)
       or !_rlink.command(MOTOR_2_GO, speed_r)) {
     IDP_ERR << "Error occurred in sending command to motor. " << std::endl;
     throw idp::Robot::LinkError();
@@ -260,18 +228,71 @@ void idp::Robot::turn(const double angle, const double angular_velocity) {
   int current_ms = _sw.read();
   move(motor_demand);
 
-  while (_sw.read() - current_ms < delta_t_ms - 10) { // 10 ms to account for lag
+  while (_sw.read() - current_ms < delta_t_ms) {
     update_tracking();
-    delay(10);
+    update_light_sensors();
   }
 
   move(zero);
 }
 
-
 void idp::Robot::turn(const double angle) {
   turn(angle, _constants.cruise_speed / _constants.half_axle_length);
 }
+
+void idp::Robot::turn_until_line(bool anticlockwise,
+                                 const double threshold_angle, 
+                                 const double max_angle, 
+                                 const double angular_velocity) {
+  int delta_t_ms;
+  int threshold_ms;
+  
+  double speed;
+  if (anticlockwise) {
+    delta_t_ms = max_angle / angular_velocity * 1000;
+    threshold_ms = threshold_angle / angular_velocity * 1000;
+    speed = angular_velocity * _constants.half_axle_length;
+  }
+  else {
+    delta_t_ms = -max_angle / angular_velocity * 1000;
+    threshold_ms = threshold_angle / angular_velocity * 1000;
+    speed = -angular_velocity * _constants.half_axle_length;
+  }
+
+  // If angular velocity is positive (anticlockwise), then left motor should go backwards.  
+  idp::Robot::MotorDemand motor_demand(-speed, speed);
+  idp::Robot::MotorDemand zero(0,0);
+
+  int current_ms = _sw.read();
+  move(motor_demand);
+
+  double turned_radians;
+  
+  int elapsed_ms;
+
+  while ((elapsed_ms = _sw.read() - current_ms) < delta_t_ms) {
+    update_tracking();
+    update_light_sensors();
+    if (_light_sensors_history->back().value.values.rear == 1 and elapsed_ms > threshold_ms) {
+      IDP_INFO << "Hit line while turning." << std::endl;
+      if (anticlockwise) {
+        turned_radians = (elapsed_ms) * angular_velocity;
+        break;
+      }
+    }
+  }
+
+  move(zero);
+  IDP_INFO << "Turned for " << turned_radians << " radians." << std::endl;
+}
+
+void idp::Robot::turn_until_line(bool anticlockwise) {
+  turn_until_line(anticlockwise, 
+                  _constants.turn_until_line_threshold_angle, 
+                  _constants.turn_until_line_max_angle, 
+                  _constants.cruise_speed / _constants.half_axle_length);
+}
+
 
 void idp::Robot::update_tracking() {
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -317,6 +338,7 @@ void idp::Robot::update_tracking() {
   _tracking_history->push_back(tracking);
 }
 
+
 void idp::Robot::update_light_sensors() {
   idp::Timestamp<idp::Robot::LightSensors> light_sensors;
   int rc = _rlink.request(READ_PORT_5);
@@ -332,86 +354,91 @@ void idp::Robot::update_light_sensors() {
   _light_sensors_history->push_back(light_sensors);
 }
 
-
-void idp::Robot::line_sensor_analysis() {
-
-  int line_sensors = _light_sensors_history->back().value.cat bitand 0x0F;
-  int ms = _light_sensors_history->back().ms;
-
-  idp::Timestamp<double> x;
+void idp::Robot::line_following() {
+  idp::Robot::LightSensorValues line_sensors = _light_sensors_history->back().value.values;
 
   bool close_to_intersection = (_map->distance_from_intersection(_tracking_history->back().value.position) > _constants.intersection_threshold_distance);
 
-  switch (line_sensors bitand 0x07) { // ignore rear sensor now
-    case 0x00:
-      // All black! We are definitely lost here.  
-      IDP_INFO << "All black." << std::endl;
+  if (line_sensors.front_left == 0 
+      and line_sensors.front_centre == 0 
+      and line_sensors.front_right == 0) {
+    IDP_INFO << "All black" << std::endl;
+    move(MotorDemand(0,0));
+    throw idp::Robot::LineFollowingError();
+  }
+  
+  else if (line_sensors.front_left == 0 
+      and line_sensors.front_centre == 1 
+      and line_sensors.front_right == 0) {
+        
+    IDP_INFO << "All black except middle sensor" << std::endl;
+
+    idp::Robot::LightSensorValues prev_line_sensors = _light_sensors_history->at(_light_sensors_history->size() - 1).value.values;
+    
+    if (prev_line_sensors.front_left == 1 
+        and prev_line_sensors.front_right == 0) {
+      turn_until_line(false);
+    }
+      
+    else if (prev_line_sensors.front_right == 1
+             and prev_line_sensors.front_left == 0) {
+      turn_until_line(true);
+    }
+  }
+
+  else if (line_sensors.front_left == 1
+      and line_sensors.front_centre == 1
+      and line_sensors.front_right == 0) {
+    IDP_INFO << "Left and center sensors are white" << std::endl;
+    move(calculate_demand(1));
+  }
+
+  else if (line_sensors.front_left == 1
+      and line_sensors.front_centre == 0 
+      and line_sensors.front_right == 0) {
+    IDP_INFO << "Far left sensor is white" << std::endl;
+    move(calculate_demand(2));
+  }
+
+  else if (line_sensors.front_left == 0
+      and line_sensors.front_centre == 1 
+      and line_sensors.front_right == 1) {
+    IDP_INFO << "Right and center sensors are white" << std::endl;
+    move(calculate_demand(-1));
+  }
+
+  else if (line_sensors.front_left == 0
+      and line_sensors.front_centre == 0 
+      and line_sensors.front_right == 1) {
+    IDP_INFO << "Far right sensor is white" << std::endl;
+    move(calculate_demand(-2));
+  }
+  
+  else if (line_sensors.front_left == 1
+      and line_sensors.front_centre == 0
+      and line_sensors.front_right == 1) {
+    if (!close_to_intersection) {
+      IDP_ERR << "Position tracking says we are far from intersection but we read front left and front right sensors white from light sensor board." << std::endl;
+      throw idp::Robot::PositionTrackingError();
+    }
+    else {
+      IDP_WARN << "Robot is at an odd angle to line, starting recovery procedure." << std::endl;
       throw idp::Robot::LineFollowingError();
-      break;
+    }  
+  }
 
-    case 0x01:
-      // All black except the left sensor.  
-      IDP_INFO << "All black except left sensor" << std::endl;
-      x.value = 2;
-      x.ms = ms;
-      _control_loop.update(x);
-      break;
-
-    case 0x02:
-      // Center sensor is white, we are right on target.  
-      IDP_INFO << "All black except middle sensor" << std::endl;
-      x.value = 0;
-      x.ms = ms;
-      _control_loop.update(x);
-      break;
-
-    case 0x03:
-      // Left and center sensors are white
-      IDP_INFO << "Left and center sensors are white" << std::endl;
-      x.value = 1;
-      x.ms = ms;
-      _control_loop.update(x);
-      break;
-
-    case 0x04:
-      // All black except the far right sensor.  
-      IDP_INFO << "Far right sensor is white" << std::endl;
-      x.value = -2;
-      x.ms = ms;
-      _control_loop.update(x);
-      break;
-
-    case 0x05:
-      if (!close_to_intersection) {
-        IDP_ERR << "Position tracking says we are far from intersection but we read value " 
-                  << std::hex << line_sensors << " from light sensor board." << std::endl;
-        throw idp::Robot::PositionTrackingError();
-      }
-      else {
+  else if (line_sensors.front_left == 1
+      and line_sensors.front_centre == 1
+      and line_sensors.front_right == 1) {
+    if (!close_to_intersection) {
         IDP_WARN << "Robot is at an odd angle to line, starting recovery procedure." << std::endl;
         throw idp::Robot::LineFollowingError();
-      }
-      break;
-
-    case 0x06:
-      // Right and center sensors are white
-      IDP_INFO << "Right and center sensors are white" << std::endl;
-      x.value = -1;
-      x.ms = ms;
-      _control_loop.update(x);
-      break;
-
-    case 0x07:
-      if (!close_to_intersection) {
-        IDP_WARN << "Robot is at an odd angle to line, starting recovery procedure." << std::endl;
-        throw idp::Robot::LineFollowingError();
-      }
-      else {
-        // We hit that intersection!!!
-        at_intersection = true;
-        IDP_INFO << "We have reached the intersection. " << std::endl;
-      }
-      break;
+    }
+    else {
+      // We hit that intersection!!!
+      at_intersection = true;
+      IDP_INFO << "We have reached the intersection. " << std::endl;
+    }
   }
 }
 
@@ -425,13 +452,20 @@ void idp::Robot::tracking_analysis() {
   }
 }
 
-idp::Robot::MotorDemand idp::Robot::calculate_demand() {
+idp::Robot::MotorDemand idp::Robot::calculate_demand(double error) {
   idp::Robot::MotorDemand motor_demand;
+  
+  double target_curvature = error * _constants.line_following_kp;
 
-  motor_demand.speed_l = _target_speed * (1 - _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
-  motor_demand.speed_r = _target_speed * (1 + _constants.half_axle_length * (_target_curvature + _control_loop.get_demand()));
+  motor_demand.speed_l = _constants.cruise_speed * (1 - _constants.half_axle_length * (target_curvature));
+  motor_demand.speed_r = _constants.cruise_speed * (1 + _constants.half_axle_length * (target_curvature));
 
   return motor_demand;
+}
+
+bool idp::Robot::hit_line() {
+  if ((_light_sensors_history->back().value.cat bitand 0x07) == 0x07) return true;
+  else return false;
 }
 
 void idp::Robot::go_blind(Vector2d target_position) {
@@ -458,7 +492,7 @@ void idp::Robot::recovery() {
 
 void idp::Robot::actuator1_on() {
   if (actuator2_is_on) {
-    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
+    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
       IDP_ERR << "Could not send command to actuator board" << std::endl;
       throw idp::Robot::ActuatorError();
     }
@@ -480,7 +514,7 @@ void idp::Robot::actuator1_off() {
     }
   }
   else {
-    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
+    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
       IDP_ERR << "Could not send command to actuator board" << std::endl;
       throw idp::Robot::ActuatorError();
     }
@@ -490,7 +524,7 @@ void idp::Robot::actuator1_off() {
 
 void idp::Robot::actuator2_on() {
   if (actuator1_is_on) {
-    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
+    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
       IDP_ERR << "Could not send command to actuator board" << std::endl;
       throw idp::Robot::ActuatorError();
     }
@@ -512,7 +546,7 @@ void idp::Robot::actuator2_off() {
     }
   }
   else {
-    if (!_rlink.command(WRITE_PORT_2, 0x00)) {
+    if (!_rlink.command(WRITE_PORT_2, 0xC0)) {
       IDP_ERR << "Could not send command to actuator board" << std::endl;
       throw idp::Robot::ActuatorError();
     }
