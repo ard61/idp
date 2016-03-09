@@ -22,13 +22,8 @@ int main(int argc, char* argv[]) {
   }
   catch (idp::Robot::LinkError& e) {
     IDP_ERR << "First configuration failed. Exiting." << std::endl;
-    return -1;
-  }
-  catch (idp::Robot::LightSensorError& e) {
-    IDP_ERR << "Could not talk to light sensor board. " << std::endl;
     //return -1;
   }
-
 
   try {
     r.test();
@@ -37,24 +32,16 @@ int main(int argc, char* argv[]) {
     IDP_ERR << "Preliminary test failed. Exiting." << std::endl;
     return -1;
   }
-
+  
+  stopwatch test_stopwatch;
+  test_stopwatch.start();
 
   // Main loop here.
   try {  // Normal line-following regime.
-    IDP_INFO << "Turning actuator 1 on" << std::endl;
-    r.actuator1_on();
-    delay(1000);
-    
-    IDP_INFO << "Turning actuator 2 on" << std::endl;
-    r.actuator2_on();
-    delay(1000);
-    
-    IDP_INFO << "Turning actuator 1 off" << std::endl;
-    r.actuator1_off();
-    delay(1000);
-    
-    IDP_INFO << "Turning actuator 2 off" << std::endl;
-    r.actuator2_off();
+    IDP_INFO << "Closing claws" << std::endl;
+    r.claws_close();
+    IDP_INFO << "Opening claws" << std::endl;
+    r.claws_open();
   }
   catch (idp::Robot::ActuatorError& e) {
     

@@ -13,6 +13,10 @@ idp::Robot::Robot() : actuator1_is_on(false), actuator2_is_on(false) {
   _light_sensors_history = new LightSensorsHistory();
   _tracking_history = new TrackingHistory();
   _map = new idp::Map();
+  
+  at_intersection = false;
+  newly_arrived_at_intersection = false;
+  claws_are_open = true; // We always assume that robot starts with claws open.
 }
 
 idp::Robot::~Robot() {
@@ -46,9 +50,11 @@ void idp::Robot::load_constants() {
   _constants.turn_until_orientation_tolerance = 0.05; // radians
 
   // Line following
-  // PID coefficients determined using Ziegler-Nichols method.  
   _constants.line_following_kp = 1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
+  
+  // Egg processing
+  _constants.claw_open_time = 1;
 
   // Put the first value of position and speed in the _tracking_history data structure
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -178,9 +184,9 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   /*
   Motor wiring:
 
-  MOTOR_1 -> red -> left motor
+  MOTOR_1 -> red
   MOTOR_2 -> green -> right motor
-  MOTOR_3 -> blue
+  MOTOR_3 -> blue -> left motor
   MOTOR_4 -> yellow
   */
   
@@ -484,8 +490,11 @@ void idp::Robot::line_following() {
     }
     else {
       // We hit that intersection!!!
+      newly_arrived_at_intersection = true;
+      if (at_intersection == true) newly_arrived_at_intersection = false;
       at_intersection = true;
       IDP_INFO << "We have reached the intersection. " << std::endl;
+      move(MotorDemand(_constants.cruise_speed, _constants.cruise_speed));
     }
   }
 }
@@ -512,7 +521,7 @@ idp::Robot::MotorDemand idp::Robot::calculate_demand(double error) {
 }
 
 bool idp::Robot::hit_line() {
-  if ((_light_sensors_history->back().value.cat bitand 0x07) == 0x07) return true;
+  if ((_light_sensors_history->back().value.values.front_centre) == 1) return true;
   else return false;
 }
 
@@ -666,3 +675,48 @@ void idp::Robot::actuator2_off() {
   }
   actuator2_is_on = false;
 }
+
+void idp::Robot::claws_open() {
+  if (claws_are_open) {
+    IDP_WARN << "Trying to open claws, but claws are already open." << std::endl;
+  }
+  else {
+    int current_ms = _sw.read();
+    _rlink.command(MOTOR_4_GO, 127);
+    while (_sw.read() - current_ms < _constants.claw_open_time) {
+      // Do nothing
+    }
+    _rlink.command(MOTOR_4_GO, 0);
+    claws_are_open = true;
+  }
+}
+
+void idp::Robot::claws_close() {
+  if (!claws_are_open) {
+    IDP_WARN << "Trying to close claws, but claws are already closed." << std::endl;
+  }
+  else {
+    int current_ms = _sw.read();
+    _rlink.command(MOTOR_4_GO, -127);
+    while (_sw.read() - current_ms < _constants.claw_open_time) {
+      // Do nothing
+    }
+    _rlink.command(MOTOR_4_GO, 0);
+    claws_are_open = false;
+  }
+}
+
+bool idp::Robot::egg_is_fake() {
+  update_light_sensors();
+  if (_light_sensors_history->back().value.values.egg_sensor == 0) // Light sensor board output is low
+    return true;
+  else return false;
+}
+
+bool idp::Robot::content_is_white() {
+  update_light_sensors();
+  if (_light_sensors_history->back().value.values.content_sensor == 0) // Light sensor board output is low
+    return true;
+  else return false;
+}
+

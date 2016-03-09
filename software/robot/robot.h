@@ -202,6 +202,7 @@ public:
     double turn_until_line_max_angle;
     double turn_until_line_threshold_angle;
     double turn_until_orientation_tolerance;
+    double claw_open_time;
   } _constants;
 
   // Initialisation
@@ -267,6 +268,7 @@ public:
   void tracking_analysis();
   MotorDemand calculate_demand(double error);
   bool at_intersection;
+  bool newly_arrived_at_intersection;
   
   bool hit_line();
 
@@ -287,13 +289,13 @@ public:
   void led2_on();
   void led2_off();
   
-  void pickup_egg();
-  int identify_egg();
-  void crack_egg();
-  int identify_inside();
-  void drop_inside();
-  void drop_shells();
-
+  void claws_open();
+  void claws_close();
+  
+  bool egg_is_fake();
+  bool content_is_white();
+  
+  
 private:
   // Stopwatch
   stopwatch _sw;
@@ -320,6 +322,7 @@ private:
   bool actuator2_is_on;
   bool led1_is_on;
   bool led2_is_on;
+  bool claws_are_open;
 }; // class Robot
 
 } // namespace idp

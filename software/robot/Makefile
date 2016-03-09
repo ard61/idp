@@ -9,7 +9,7 @@ ARM_CFLAGS=-c -ansi -Wall -g -I/export/teach/1BRobot -I/usr/arm-unknown-linux-gn
 LDFLAGS=-L/export/teach/1BRobot -lrobot
 ARM_LDFLAGS=-L/usr/arm-unknown-linux-gnueabi/lib -lrobot
 
-SOURCES=main.cc robot.cc map.cc robot.h logging.h line_following_test.cc propulsion_test.cc actuator_test.cc led_test.cc
+SOURCES=main.cc robot.cc map.cc robot.h logging.h line_following_test.cc propulsion_test.cc actuator_test.cc led_test.cc claws_test.cc
 
 OBJECTS=main.o robot.o map.o
 ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
@@ -17,7 +17,7 @@ ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
 EXECUTABLE=robot
 ARM_EXECUTABLE=robot.arm
 
-all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm propulsion_test propulsion_test.arm actuator_test actuator_test.arm led_test led_test.arm
+all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm propulsion_test propulsion_test.arm actuator_test actuator_test.arm led_test led_test.arm claws_test claws_test.arm
 
 clean:
 	rm -f *.o
@@ -51,6 +51,12 @@ led_test: led_test.o robot.o map.o
 
 led_test.arm: led_test_arm.o robot_arm.o map_arm.o
 	$(ARM_CC) led_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
+	
+claws_test: claws_test.o robot.o map.o
+	$(CC) claws_test.o robot.o map.o -o $@ $(LDFLAGS)
+
+claws_test.arm: claws_test_arm.o robot_arm.o map_arm.o
+	$(ARM_CC) claws_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
 
 
 main.o: main.cc robot.h logging.h
@@ -74,6 +80,9 @@ actuator_test.o: actuator_test.cc robot.h logging.h
 led_test.o: led_test.cc robot.h logging.h
 	$(CC) $(CFLAGS) led_test.cc -o $@
 
+claws_test.o: claws_test.cc robot.h logging.h
+	$(CC) $(CFLAGS) claws_test.cc -o $@
+
 
 main_arm.o: main.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) main.cc -o $@
@@ -95,3 +104,6 @@ actuator_test_arm.o: actuator_test.cc robot.h logging.h
 
 led_test_arm.o: led_test.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) led_test.cc -o $@
+
+claws_test_arm.o: claws_test.cc robot.h logging.h
+	$(ARM_CC) $(ARM_CFLAGS) claws_test.cc -o $@
