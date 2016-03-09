@@ -9,7 +9,7 @@ ARM_CFLAGS=-c -ansi -Wall -g -I/export/teach/1BRobot -I/usr/arm-unknown-linux-gn
 LDFLAGS=-L/export/teach/1BRobot -lrobot
 ARM_LDFLAGS=-L/usr/arm-unknown-linux-gnueabi/lib -lrobot
 
-SOURCES=main.cc robot.cc map.cc robot.h logging.h line_following_test.cc propulsion_test.cc actuator_test.cc
+SOURCES=main.cc robot.cc map.cc robot.h logging.h line_following_test.cc propulsion_test.cc actuator_test.cc led_test.cc
 
 OBJECTS=main.o robot.o map.o
 ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
@@ -17,7 +17,7 @@ ARM_OBJECTS=main_arm.o robot_arm.o map_arm.o
 EXECUTABLE=robot
 ARM_EXECUTABLE=robot.arm
 
-all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm propulsion_test propulsion_test.arm actuator_test actuator_test.arm
+all: $(SOURCES) $(EXECUTABLE) $(ARM_EXECUTABLE) line_following_test line_following_test.arm propulsion_test propulsion_test.arm actuator_test actuator_test.arm led_test led_test.arm
 
 clean:
 	rm -f *.o
@@ -46,6 +46,11 @@ actuator_test: actuator_test.o robot.o map.o
 actuator_test.arm: actuator_test_arm.o robot_arm.o map_arm.o
 	$(ARM_CC) actuator_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
 
+led_test: led_test.o robot.o map.o
+	$(CC) led_test.o robot.o map.o -o $@ $(LDFLAGS)
+
+led_test.arm: led_test_arm.o robot_arm.o map_arm.o
+	$(ARM_CC) led_test_arm.o robot_arm.o map_arm.o -o $@ $(ARM_LDFLAGS)
 
 
 main.o: main.cc robot.h logging.h
@@ -66,6 +71,9 @@ propulsion_test.o: propulsion_test.cc robot.h logging.h
 actuator_test.o: actuator_test.cc robot.h logging.h
 	$(CC) $(CFLAGS) actuator_test.cc -o $@
 
+led_test.o: led_test.cc robot.h logging.h
+	$(CC) $(CFLAGS) led_test.cc -o $@
+
 
 main_arm.o: main.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) main.cc -o $@
@@ -84,3 +92,6 @@ propulsion_test_arm.o: propulsion_test.cc robot.h logging.h
 	
 actuator_test_arm.o: actuator_test.cc robot.h logging.h
 	$(ARM_CC) $(ARM_CFLAGS) actuator_test.cc -o $@
+
+led_test_arm.o: led_test.cc robot.h logging.h
+	$(ARM_CC) $(ARM_CFLAGS) led_test.cc -o $@

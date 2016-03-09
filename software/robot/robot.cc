@@ -39,14 +39,15 @@ void idp::Robot::load_constants() {
   _constants.turn_until_line_max_angle = M_PI/2;  // Default max. angle the robot will turn through if it does not hit a white line.  Prevents infinite 360 deg. turns.
   
   // Tracking
-  _constants.initial_position_x = 0.1;  // Robot initial position, x-coordinate
-  _constants.initial_position_y = 0.1;  // Robot initial position, y-coordinate
+  _constants.initial_position_x = -0.9;  // Robot initial position, x-coordinate
+  _constants.initial_position_y = 0;  // Robot initial position, y-coordinate
   _constants.initial_orientation = 0;  // Robot initial orientation
   _constants.go_blind_tolerance = 0.02;
+  _constants.turn_until_orientation_tolerance = 0.05; // radians
 
   // Line following
   // PID coefficients determined using Ziegler-Nichols method.  
-  _constants.line_following_kp = -1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
+  _constants.line_following_kp = 1.2;  // Proportional control loop coefficient, gives curvature as a function of error. 
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
 
   // Put the first value of position and speed in the _tracking_history data structure
@@ -56,6 +57,7 @@ void idp::Robot::load_constants() {
   tracking.value.curvature = 0;
   tracking.value.position = idp::Vector2d(_constants.initial_position_x, _constants.initial_position_y);
   tracking.value.orientation = _constants.initial_orientation;
+  tracking.value.distance = 0;
 
   _tracking_history->push_back(tracking);
   
@@ -102,11 +104,13 @@ void idp::Robot::configure() {
   // Set bits 0-3 and 6-7 on light sensor board (address 101)
   if (!_rlink.command(WRITE_PORT_5, 0xCF)) {
     IDP_ERR << "Could not set up I2C bus to read from light sensor board." << std::endl;
-    throw idp::Robot::LinkError();
+    throw idp::Robot::LightSensorError();
   }
   
   actuator1_off();
   actuator2_off();
+  led1_off();
+  led2_off();
   
   // Take initial sensor readings from light sensors to start populating history. 
   update_light_sensors();
@@ -161,7 +165,7 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   }
 
   // TODO: Put negative signs here if needed when final motor orientation becomes known
-  int motor1_demand = 127 * motor_demand.speed_l / _constants.max_speed_l;  // Between -127 and 127.
+  int motor1_demand = -127 * motor_demand.speed_l / _constants.max_speed_l;  // Between -127 and 127.
   int motor2_demand = 127 * motor_demand.speed_r / _constants.max_speed_r;
 
   unsigned char speed_l, speed_r;
@@ -190,7 +194,7 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand) {
   }
 }
 
-void idp::Robot::move(idp::Robot::MotorDemand motor_demand, double distance) {
+void idp::Robot::move(const idp::Robot::MotorDemand motor_demand, const double distance) {
   int delta_t_ms = 2 * distance / (motor_demand.speed_l + motor_demand.speed_r) * 1000;
   
   idp::Robot::MotorDemand zero(0,0);
@@ -200,6 +204,7 @@ void idp::Robot::move(idp::Robot::MotorDemand motor_demand, double distance) {
 
   while (_sw.read() - current_ms < delta_t_ms - 10) { // 10 ms to account for lag
     update_tracking();
+    update_light_sensors();
     delay(10);
   }
 
@@ -240,7 +245,7 @@ void idp::Robot::turn(const double angle) {
   turn(angle, _constants.cruise_speed / _constants.half_axle_length);
 }
 
-void idp::Robot::turn_until_line(bool anticlockwise,
+void idp::Robot::turn_until_line(const bool anticlockwise,
                                  const double threshold_angle, 
                                  const double max_angle, 
                                  const double angular_velocity) {
@@ -293,6 +298,33 @@ void idp::Robot::turn_until_line(bool anticlockwise) {
                   _constants.cruise_speed / _constants.half_axle_length);
 }
 
+void idp::Robot::turn_until_orientation(const double final_orientation, const double angular_velocity) {
+  double speed;
+  if ((final_orientation - get_tracking().orientation > 0) 
+     or (final_orientation - get_tracking().orientation < -M_PI)) {
+    speed = angular_velocity * _constants.half_axle_length;
+  }
+  else {
+    speed = -angular_velocity * _constants.half_axle_length;
+  }
+
+  // If angular velocity is positive (anticlockwise), then left motor should go backwards.  
+  idp::Robot::MotorDemand motor_demand(-speed, speed);
+  idp::Robot::MotorDemand zero(0,0);
+
+  move(motor_demand);
+
+  while ((get_tracking().orientation > final_orientation + _constants.turn_until_orientation_tolerance)
+        or (get_tracking().orientation < final_orientation - _constants.turn_until_orientation_tolerance)) {
+    update_tracking();
+    update_light_sensors();
+  }
+  move(zero);
+}
+
+void idp::Robot::turn_until_orientation(const double final_orientation) {
+  turn_until_orientation(final_orientation, _constants.cruise_speed/_constants.half_axle_length);
+}
 
 void idp::Robot::update_tracking() {
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -324,20 +356,34 @@ void idp::Robot::update_tracking() {
   double delta_t = tracking.ms - _tracking_history->back().ms;
 
   double prev_orientation = _tracking_history->back().value.orientation;
-  double prev_curvature = _tracking_history->back().value.curvature;
+  //double prev_curvature = _tracking_history->back().value.curvature;
   double prev_speed = _tracking_history->back().value.speed;
   idp::Vector2d prev_position = _tracking_history->back().value.position;
+  double prev_distance = _tracking_history->back().value.distance;
 
-  tracking.value.orientation = prev_orientation + delta_t * ((tracking.value.speed + prev_speed) / 2) * ((tracking.value.curvature + prev_curvature) / 2);
+  // Don't integrate orientation from curvature as the latter is potentially infinite.  
+  tracking.value.orientation = prev_orientation + delta_t * (speed_r - speed_l) / (2 * _constants.half_axle_length);
   while (tracking.value.orientation < -M_PI) tracking.value.orientation += 2*M_PI;
   while (tracking.value.orientation >= M_PI) tracking.value.orientation -= 2*M_PI;
   tracking.value.position = prev_position + delta_t * ((tracking.value.speed + prev_speed) / 2) * idp::Vector2d::from_polar(1, (tracking.value.orientation + prev_orientation) / 2);
-
+  tracking.value.distance = prev_distance + delta_t * (tracking.value.speed + prev_speed) / 2;
   // Store into the _tracking data structure
 
   _tracking_history->push_back(tracking);
 }
 
+void idp::Robot::print_tracking() {
+  IDP_INFO << "Position: x=" << _tracking_history->back().value.position.x
+           << ", y=" << _tracking_history->back().value.position.y << std::endl;
+  IDP_INFO << "Orientation: " << _tracking_history->back().value.orientation << "rads, anticlockwise from horizontal" << std::endl;
+  IDP_INFO << "Speed: " << _tracking_history->back().value.speed << std::endl;
+  IDP_INFO << "Path curvature: " << _tracking_history->back().value.speed << std::endl;
+  IDP_INFO << "Distance travelled: " << _tracking_history->back().value.distance << std::endl;
+}
+
+idp::Robot::Tracking idp::Robot::get_tracking() {
+  return _tracking_history->back().value;
+}
 
 void idp::Robot::update_light_sensors() {
   idp::Timestamp<idp::Robot::LightSensors> light_sensors;
@@ -345,7 +391,7 @@ void idp::Robot::update_light_sensors() {
 
   if (rc == REQUEST_ERROR) {
     IDP_ERR << "Error occurred when reading from light sensor board (I2C address 5). " << std::endl;
-    throw idp::Robot::LinkError();
+    throw idp::Robot::LightSensorError();
   }
 
   light_sensors.ms = _sw.read();
@@ -384,6 +430,8 @@ void idp::Robot::line_following() {
              and prev_line_sensors.front_left == 0) {
       turn_until_line(true);
     }
+    
+    else move(MotorDemand(_constants.cruise_speed, _constants.cruise_speed));
   }
 
   else if (line_sensors.front_left == 1
@@ -489,6 +537,71 @@ void idp::Robot::go_blind_iter(Vector2d target_position) {
 void idp::Robot::recovery() {
   // First we need to know which line we are on
 }
+
+void idp::Robot::led1_on() {
+  if (led2_is_on) {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x00)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x20)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  led1_is_on = true;
+}
+
+void idp::Robot::led1_off() {
+  if (led2_is_on) {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x10)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x30)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  led1_is_on = false;
+}
+
+void idp::Robot::led2_on() {
+  if (led1_is_on) {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x00)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x10)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  led2_is_on = true;
+}
+
+void idp::Robot::led2_off() {
+  if (led1_is_on) {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x20)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  else {
+    if (!_rlink.command(WRITE_PORT_5, 0xCF bitor 0x30)) {
+      IDP_ERR << "Could not send command to LED board" << std::endl;
+      throw idp::Robot::LightSensorError();
+    }
+  }
+  led2_is_on = false;
+}
+
 
 void idp::Robot::actuator1_on() {
   if (actuator2_is_on) {

@@ -2,7 +2,7 @@
 
 #include "logging.h"
 #include "robot.h"
-#include "delay.h"
+#include <delay.h>
 
 stopwatch idp::logging::logging_stopwatch;
 
@@ -10,11 +10,7 @@ int main(int argc, char* argv[]) {
   idp::logging::log_init();
   idp::Robot r;
   
-  IDP_INFO << "Loading constants." << std::endl;
-  
   r.load_constants();
-  
-  IDP_INFO << "Done loading constants." << std::endl;
 
   if (!r.initialise()) {
     IDP_ERR << "Unable to connect to robot. Exiting." << std::endl;
@@ -25,8 +21,11 @@ int main(int argc, char* argv[]) {
     r.configure();
   }
   catch (idp::Robot::LinkError& e) {
-    //IDP_ERR << "First configuration failed. Exiting." << std::endl;
+    IDP_ERR << "First configuration failed. Exiting." << std::endl;
     //return -1;
+  }
+  catch (idp::Robot::ActuatorError& e) {
+    // This should not be a problem
   }
 
   try {
@@ -36,29 +35,32 @@ int main(int argc, char* argv[]) {
     IDP_ERR << "Preliminary test failed. Exiting." << std::endl;
     return -1;
   }
+  
+  stopwatch test_stopwatch;
+  test_stopwatch.start();
 
-
-  try {
-    IDP_INFO << "Moving at maximum speed for 10 seconds." << std::endl;
-    r.move(idp::Robot::MotorDemand(r._constants.max_speed_l, r._constants.max_speed_r));
-    delay(10000);  // delay 10 seconds
-	r.move(idp::Robot::MotorDemand(0,0));
-	
-  /*
-	IDP_INFO << "Rotating 90 degrees anticlockwise." << std::endl;
-	r.turn(M_PI/2);
-	
-	delay(2000);
-	
-	IDP_INFO << "Rotating 90 degrees clockwise." << std::endl;
-	r.turn(-M_PI/2);
-	
-	IDP_INFO << "Reversing at maximum speed for 10 seconds." << std::endl;
-    r.move(idp::Robot::MotorDemand(-r._constants.max_speed_l, -r._constants.max_speed_l));
-    delay(10000);  // delay 10 seconds
-  */
-	r.move(idp::Robot::MotorDemand(0,0));
+  // Main loop here.
+  try {  // Normal line-following regime.
+    IDP_INFO << "Turning LED 1 on" << std::endl;
+    r.led1_on();
+    delay(1000);
+    
+    IDP_INFO << "Turning LED 2 on" << std::endl;
+    r.led2_on();
+    delay(1000);
+    
+    IDP_INFO << "Turning LED 1 off" << std::endl;
+    r.led1_off();
+    delay(1000);
+    
+    IDP_INFO << "Turning LED 2 off" << std::endl;
+    r.led2_off();
   }
+  catch (idp::Robot::ActuatorError& e) {
+    
+    
+  }
+
   catch (idp::Robot::LinkError& e) {
     // Something's gone wrong with the link.  
     if (!r.reinitialise()) {

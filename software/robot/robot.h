@@ -175,6 +175,13 @@ public:
     }  
   };
   
+  class LightSensorError : public std::exception {
+    virtual const char* what() const throw()
+    {
+      return "Could not send command to light sensor / LED board.";
+    }  
+  };
+  
   // Constants
   struct Constants {
     int robot_num;
@@ -194,6 +201,7 @@ public:
     double go_blind_tolerance;
     double turn_until_line_max_angle;
     double turn_until_line_threshold_angle;
+    double turn_until_orientation_tolerance;
   } _constants;
 
   // Initialisation
@@ -215,22 +223,27 @@ public:
   }; // class MotorDemand
 
   void move(MotorDemand motor_demand);
-  void move(MotorDemand motor_demand, double distance);
+  void move(const MotorDemand motor_demand, const double distance);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
-  void turn_until_line(bool anticlockwise, const double threshold_angle, const double max_angle, const double angular_velocity);
-  void turn_until_line(bool anticlockwise);
+  void turn_until_line(const bool anticlockwise, const double threshold_angle, const double max_angle, const double angular_velocity);
+  void turn_until_line(const bool anticlockwise);
+  void turn_until_orientation(const double final_orientation, const double angular_velocity);
+  void turn_until_orientation(const double final_orientation);
 
   // Position tracking
-  void update_tracking();
-
   struct Tracking {
     double speed;
     double curvature;  // Curvature is K = (angular velocity) / speed
     Vector2d position;
     double orientation;  // Orientation of the robot, in radians (anticlockwise from horizontal)
+    double distance;
   };
   typedef std::vector<Timestamp<Tracking> > TrackingHistory;
+  
+  void update_tracking();
+  void print_tracking();
+  Tracking get_tracking();
 
   // Line following
   struct LightSensorValues { // 0 means white, 1 means black
@@ -268,13 +281,18 @@ public:
   void actuator1_off();
   void actuator2_on();
   void actuator2_off();
+  
+  void led1_on();
+  void led1_off();
+  void led2_on();
+  void led2_off();
+  
   void pickup_egg();
   int identify_egg();
   void crack_egg();
   int identify_inside();
   void drop_inside();
   void drop_shells();
-  
 
 private:
   // Stopwatch
@@ -300,6 +318,8 @@ private:
   
   bool actuator1_is_on;
   bool actuator2_is_on;
+  bool led1_is_on;
+  bool led2_is_on;
 }; // class Robot
 
 } // namespace idp

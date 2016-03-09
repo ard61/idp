@@ -43,7 +43,10 @@ int main(int argc, char* argv[]) {
       r.line_following();
     }
     IDP_INFO << "Rotating 90 degrees clockwise." << std::endl;
-	r.turn(-M_PI/2);
+    r.turn(-M_PI/2);
+    
+    // Now we test the position tracking algorithm.
+    r.print_tracking();
   }
   catch (idp::Robot::LineFollowingError& e) {
     // We're lost! Enter recovery mode now.  
