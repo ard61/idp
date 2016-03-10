@@ -265,12 +265,16 @@ public:
 
   void update_light_sensors();
   void line_following();
+  void line_following(double distance);
+  void line_following_until_intersection();
+
   void tracking_analysis();
   MotorDemand calculate_demand(double error);
   bool at_intersection;
   bool newly_arrived_at_intersection;
   
   bool hit_line();
+  void move_until_hit_line();
 
   void go_blind_iter(Vector2d target_position);
   void go_blind(Vector2d target_position);
@@ -283,6 +287,10 @@ public:
   void actuator1_off();
   void actuator2_on();
   void actuator2_off();
+
+  void crack();
+  void release_claws();
+  void eject();
   
   void led1_on();
   void led1_off();

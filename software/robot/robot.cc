@@ -37,7 +37,7 @@ void idp::Robot::load_constants() {
   _constants.max_speed_l = 0.135;  // maximum speed of left robot motor
   _constants.max_speed_r = 0.135;  // maximum speed of right robot motor
   _constants.curve_curvature = 1.67;  // Curvature of the curved white line paths
-  _constants.cruise_speed = 0.05;  // Standard speed of the robot
+  _constants.cruise_speed = 0.12;  // Standard speed of the robot
   _constants.ramp_time = 255;  // Ramp time for robot motors
   _constants.turn_until_line_threshold_angle = 0.25;  // Threshold angle after which the robot will start detecting for a new intersection.
   _constants.turn_until_line_max_angle = M_PI/2;  // Default max. angle the robot will turn through if it does not hit a white line.  Prevents infinite 360 deg. turns.
@@ -499,6 +499,24 @@ void idp::Robot::line_following() {
   }
 }
 
+void idp::Robot::line_following(double distance) {
+  double prev_distance = r.get_tracking().distance;
+  while (r.get_tracking().distance - prev_distance < distance) {
+    r.update_tracking();
+    r.update_light_sensors();
+    r.line_following();
+  }
+}
+
+void idp::Robot::line_following_until_intersection() {
+  line_following(0.05) // Start following line for 5 cm to get clear of previous intersection
+  while (!r.newly_arrived_at_intersection) {
+    r.update_tracking();
+    r.update_light_sensors();
+    r.line_following();
+  }
+}
+
 void idp::Robot::tracking_analysis() {
   // To be performed after line following tells us whether we have arrived at an intersection or not. 
   if (at_intersection)
@@ -523,6 +541,15 @@ idp::Robot::MotorDemand idp::Robot::calculate_demand(double error) {
 bool idp::Robot::hit_line() {
   if ((_light_sensors_history->back().value.values.front_centre) == 1) return true;
   else return false;
+}
+
+void idp::Robot::move_until_hit_line(const idp::Robot::MotorDemand demand) {
+  r.move(demand);
+  while (!r.hit_line()) {
+    r.update_tracking();
+    r.update_light_sensors();
+  }
+  r.move(MotorDemand(0,0))
 }
 
 void idp::Robot::go_blind(Vector2d target_position) {
@@ -676,6 +703,22 @@ void idp::Robot::actuator2_off() {
   actuator2_is_on = false;
 }
 
+void idp::Robot::crack() {
+  actuator1_off();
+  actuator1_on();
+}
+
+void idp::Robot::release_claws() {
+  actuator1_off();
+}
+
+void idp::Robot::eject() {
+  actuator2_off();
+  actuator2_on();
+  delay(200);
+  actuator2_off();
+}
+
 void idp::Robot::claws_open() {
   if (claws_are_open) {
     IDP_WARN << "Trying to open claws, but claws are already open." << std::endl;
@@ -715,7 +758,7 @@ bool idp::Robot::egg_is_fake() {
 
 bool idp::Robot::content_is_white() {
   update_light_sensors();
-  if (_light_sensors_history->back().value.values.content_sensor == 0) // Light sensor board output is low
+  if (_light_sensors_history->back().value.values.content_sensor == 1) // Light sensor board output is low
     return true;
   else return false;
 }
