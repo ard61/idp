@@ -203,6 +203,8 @@ public:
     double turn_until_line_threshold_angle;
     double turn_until_orientation_tolerance;
     double claw_open_time;
+    double turn_calibration_constant;
+    double turn_until_line_additional_angle;
   } _constants;
 
   // Initialisation
@@ -227,8 +229,9 @@ public:
   void move(const MotorDemand motor_demand, const double distance);
   void turn(const double angle, const double angular_velocity);
   void turn(const double angle);
-  void turn_until_line(const bool anticlockwise, const double threshold_angle, const double max_angle, const double angular_velocity);
+  void turn_until_line(const bool anticlockwise, const bool threshold_active, const double threshold_angle, const double max_angle, const double angular_velocity);
   void turn_until_line(const bool anticlockwise);
+  void turn_until_line2(const bool anticlockwise);
   void turn_until_orientation(const double final_orientation, const double angular_velocity);
   void turn_until_orientation(const double final_orientation);
 
@@ -245,6 +248,11 @@ public:
   void update_tracking();
   void print_tracking();
   Tracking get_tracking();
+  
+  void reset_tracking(double orientation, Vector2d position);
+  void reset_tracking_orientation(double orientation);
+  void reset_tracking_position_x(double position_x);
+  void reset_tracking_position_y(double position_y);
 
   // Line following
   struct LightSensorValues { // 0 means white, 1 means black
@@ -265,11 +273,14 @@ public:
 
   void update_light_sensors();
   void line_following();
+  void line_following_backwards();
   void line_following(double distance);
   void line_following_until_intersection();
+  void line_following_backwards_until_intersection();
 
   void tracking_analysis();
   MotorDemand calculate_demand(double error);
+  MotorDemand calculate_demand_backwards(double error);
   bool at_intersection;
   bool newly_arrived_at_intersection;
   

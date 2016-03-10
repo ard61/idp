@@ -39,10 +39,9 @@ int main(int argc, char* argv[]) {
 
 
   try {
-    IDP_INFO << "Moving at maximum speed for 10 seconds." << std::endl;
-    r.move(idp::Robot::MotorDemand(r._constants.max_speed_l, r._constants.max_speed_r));
-    delay(10000);  // delay 10 seconds
-	r.move(idp::Robot::MotorDemand(0,0));
+    IDP_INFO << "Moving at cruise speed for 1 metre." << std::endl;
+    r.move(idp::Robot::MotorDemand(r._constants.cruise_speed, r._constants.cruise_speed), 1);
+    r.move(idp::Robot::MotorDemand(0,0));
 	
   /*
 	IDP_INFO << "Rotating 90 degrees anticlockwise." << std::endl;

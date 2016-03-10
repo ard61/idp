@@ -37,11 +37,9 @@ int main(int argc, char* argv[]) {
 
   // Main loop here.
   try {  // Normal line-following regime.
-    while (!r.at_intersection) {
-      r.update_tracking();
-      r.update_light_sensors();
-      r.line_following();
-    }
+    r.line_following_until_intersection();
+    r.print_tracking();
+    
     IDP_INFO << "Rotating 90 degrees clockwise." << std::endl;
     r.turn(-M_PI/2);
     

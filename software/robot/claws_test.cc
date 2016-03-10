@@ -40,6 +40,7 @@ int main(int argc, char* argv[]) {
   try {  // Normal line-following regime.
     IDP_INFO << "Closing claws" << std::endl;
     r.claws_close();
+    delay(1000);
     IDP_INFO << "Opening claws" << std::endl;
     r.claws_open();
   }

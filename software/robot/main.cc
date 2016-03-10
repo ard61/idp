@@ -8,45 +8,116 @@
 
 stopwatch idp::logging::logging_stopwatch;
 
-void move_from_start_to_first_pickup_site(idp::Robot &r) {
-  const idp::Robot::MotorDemand full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
 
-  // 1st step: follow line for 0.3m.
-  r.line_following(0.3);
+void move_from_start_to_first_pickup_site(idp::Robot& r) {
+  const idp::Robot::MotorDemand full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
+  const idp::Robot::MotorDemand full_reverse(-r._constants.cruise_speed, -r._constants.cruise_speed);
+
   
-  // 2nd step: turn until orientation is -30 degrees to horizontal
-  r.turn_until_orientation(-M_PI/6);
-  
-  // 3rd step: Go forward for 0.1m.
-  r.move(full_forward, 0.1);
-  
-  // 4th step: turn until orientation is 0 again.  
-  r.turn_until_orientation(0);
-  
-  // 5th step: Go forward for 0.2m.
-  r.move(full_forward, 0.1);
-  
-  // 6th step: turn until orientation is 30 degrees.
-  r.turn_until_orientation(30);
-  
-  // 7th step: move forward until line is hit.
-  r.move_until_hit_line(full_forward);
-  
-  // 8th step: turn clockwise until aligned with line again.
-  r.turn_until_line(false);
-  
-  // 9th step: follow line until intersection.
+  r.print_tracking();
+
+  IDP_INFO << "Following line until intersection" << std::endl;
   r.line_following_until_intersection();
+
+  IDP_INFO << "Following line for 55 cm" << std::endl;
+  r.line_following(0.55);
   
-  // 10th step: turn anti-clockwise until line is hit.
+  IDP_INFO << "Turning clockwise by 30 degrees" << std::endl;
+  r.turn(-M_PI/6);
+  r.print_tracking();
+  
+  IDP_INFO << "Moving forward for 25 cm" << std::endl;
+  r.move(full_forward, 0.25);
+  r.print_tracking();
+  
+  IDP_INFO << "Turning anticlockwise by 30 degrees" << std::endl;
+  r.turn(M_PI/6);
+  r.print_tracking();
+  
+  IDP_INFO << "Moving forward until line is hit" << std::endl;
+  r.move_until_hit_line(full_forward);
+  r.print_tracking();
+  
+  IDP_INFO << "Turning clockwise until line is hit" << std::endl;
+  r.turn_until_line(false);
+  r.print_tracking();
+  
+  IDP_INFO << "Following line for 40 cm" << std::endl;
+  r.line_following(0.45);
+  r.print_tracking();
+  
+  IDP_INFO << "Moving forward for 15 cm" << std::endl;
+  r.move(full_forward, 0.2);
+  r.print_tracking();
+  
+  IDP_INFO << "Following line until intersection" << std::endl;
+  r.line_following_until_intersection();
+  r.print_tracking();
+  
+  IDP_INFO << "Following line for 15 cm" << std::endl;
+  r.line_following(0.2);
+  
+  IDP_INFO << "Moving forward for 15 cm" << std::endl;
+  r.move(full_forward, 0.2);
+  r.print_tracking();
+  
+  IDP_INFO << "Following line until intersection" << std::endl;
+  r.line_following_until_intersection();
+  r.print_tracking();
+  
+  IDP_INFO << "Turning anticlockwise for 90 degrees" << std::endl;
   r.turn_until_line(true);
+  r.print_tracking();
+  
+  //IDP_INFO << "Following line backwards until intersection" << std::endl;
+  //r.line_following_backwards_until_intersection();
+}
+
+void move_from_zero_to_first_pickup_site(idp::Robot &r) {
+  IDP_INFO << "Following line unti intersection" << std::endl;
+  r.line_following_until_intersection();
+  r.print_tracking();
+  
+  IDP_INFO << "Turning anticlockwise until line is hit" << std::endl;
+  r.turn_until_line(true);
+  r.print_tracking();
 }
 
 void move_from_last_pickup_site_to_frying_pan(idp::Robot &r) {
+  const idp::Robot::MotorDemand full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
+
+  IDP_INFO << "Following line for 35 cm" << std::endl;
+  r.line_following(0.35);
+  r.print_tracking();
+  
+  IDP_INFO << "Turning for 30 degrees anticlockwise" << std::endl;
+  r.turn(M_PI/6);
+  r.print_tracking();
+  
+  IDP_INFO << "Moving until line is hit" << std::endl;
+  r.move_until_hit_line(full_forward);
+
+  // Might need to do some alignment here
 }
 
 void move_from_last_pickup_site_to_chick_dropoff_site(idp::Robot &r) {
+  const idp::Robot::MotorDemand full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
 
+  IDP_INFO << "Following line for 35 cm" << std::endl;
+  r.line_following(0.35);
+  r.print_tracking();
+  
+  IDP_INFO << "Turning for 30 degrees anticlockwise" << std::endl;
+  r.turn(M_PI/6);
+  r.print_tracking();
+  
+  IDP_INFO << "Moving until line is hit" << std::endl;
+  r.move_until_hit_line(full_forward);
+  
+  IDP_INFO << "Moving until line is hit" << std::endl;
+  r.move_until_hit_line(full_forward);
+  
+  
 }
 
 void move_from_last_pickup_site_to_egg_box(idp::Robot &r) {
@@ -103,6 +174,7 @@ int main(int argc, char* argv[]) {
     for (int eggs_picked = 0; eggs_picked < 5; eggs_picked++) {
       move_from_start_to_first_pickup_site(r);
       
+      /*
       // Follow line, stopping at the 4-eggs_picked intersection.
       for (int i = 0; i < 4 - eggs_picked; i++) {
         r.line_following_until_intersection();
@@ -150,6 +222,8 @@ int main(int argc, char* argv[]) {
         // We have picked up four eggs, but there is less than 1 minute left, so stay at base.
         break;
       }
+      */
+      break;
     }
   }
   catch (idp::Robot::LineFollowingError& e) {
