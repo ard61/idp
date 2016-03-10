@@ -500,20 +500,20 @@ void idp::Robot::line_following() {
 }
 
 void idp::Robot::line_following(double distance) {
-  double prev_distance = r.get_tracking().distance;
-  while (r.get_tracking().distance - prev_distance < distance) {
-    r.update_tracking();
-    r.update_light_sensors();
-    r.line_following();
+  double prev_distance = get_tracking().distance;
+  while (get_tracking().distance - prev_distance < distance) {
+    update_tracking();
+    update_light_sensors();
+    line_following();
   }
 }
 
 void idp::Robot::line_following_until_intersection() {
-  line_following(0.05) // Start following line for 5 cm to get clear of previous intersection
-  while (!r.newly_arrived_at_intersection) {
-    r.update_tracking();
-    r.update_light_sensors();
-    r.line_following();
+  line_following(0.05); // Start following line for 5 cm to get clear of previous intersection
+  while (!newly_arrived_at_intersection) {
+    update_tracking();
+    update_light_sensors();
+    line_following();
   }
 }
 
@@ -543,13 +543,13 @@ bool idp::Robot::hit_line() {
   else return false;
 }
 
-void idp::Robot::move_until_hit_line(const idp::Robot::MotorDemand demand) {
-  r.move(demand);
-  while (!r.hit_line()) {
-    r.update_tracking();
-    r.update_light_sensors();
+void idp::Robot::move_until_hit_line(const idp::Robot::MotorDemand motor_demand) {
+  move(motor_demand);
+  while (!hit_line()) {
+    update_tracking();
+    update_light_sensors();
   }
-  r.move(MotorDemand(0,0))
+  move(MotorDemand(0,0));
 }
 
 void idp::Robot::go_blind(Vector2d target_position) {

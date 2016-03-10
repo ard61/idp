@@ -274,7 +274,7 @@ public:
   bool newly_arrived_at_intersection;
   
   bool hit_line();
-  void move_until_hit_line();
+  void move_until_hit_line(MotorDemand motor_demand);
 
   void go_blind_iter(Vector2d target_position);
   void go_blind(Vector2d target_position);

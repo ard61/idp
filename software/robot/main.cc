@@ -8,8 +8,8 @@
 
 stopwatch idp::logging::logging_stopwatch;
 
-void move_from_start_to_first_pickup_site() {
-  const idp::Robot::MotorDemand::full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
+void move_from_start_to_first_pickup_site(idp::Robot &r) {
+  const idp::Robot::MotorDemand full_forward(r._constants.cruise_speed, r._constants.cruise_speed);
 
   // 1st step: follow line for 0.3m.
   r.line_following(0.3);
@@ -42,26 +42,26 @@ void move_from_start_to_first_pickup_site() {
   r.turn_until_line(true);
 }
 
-void move_from_last_pickup_site_to_frying_pan() {
+void move_from_last_pickup_site_to_frying_pan(idp::Robot &r) {
 }
 
-void move_from_last_pickup_site_to_chick_dropoff_site() {
-
-}
-
-void move_from_last_pickup_site_to_egg_box() {
+void move_from_last_pickup_site_to_chick_dropoff_site(idp::Robot &r) {
 
 }
 
-void move_from_frying_pan_to_egg_box() {
+void move_from_last_pickup_site_to_egg_box(idp::Robot &r) {
 
 }
 
-void move_from_chick_dropoff_site_to_egg_box() {
+void move_from_frying_pan_to_egg_box(idp::Robot &r) {
 
 }
 
-void move_from_egg_box_to_start() {
+void move_from_chick_dropoff_site_to_egg_box(idp::Robot &r) {
+
+}
+
+void move_from_egg_box_to_start(idp::Robot &r) {
 
 }
 
@@ -100,8 +100,8 @@ int main(int argc, char* argv[]) {
 
   // Main program execution here.
   try {
-    for (int eggs_picked = 0; i < 5; i++)
-      move_from_start_to_first_pickup_site();
+    for (int eggs_picked = 0; eggs_picked < 5; eggs_picked++) {
+      move_from_start_to_first_pickup_site(r);
       
       // Follow line, stopping at the 4-eggs_picked intersection.
       for (int i = 0; i < 4 - eggs_picked; i++) {
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
       }
 
       if (r.egg_is_fake()) {
-        move_from_last_pickup_site_to_egg_box();
+        move_from_last_pickup_site_to_egg_box(r);
         r.claws_open();
         r.eject();
       }
@@ -129,29 +129,28 @@ int main(int argc, char* argv[]) {
         r.claws_close();
 
         if (r.content_is_white()) {
-          move_from_last_pickup_site_to_frying_pan();
+          move_from_last_pickup_site_to_frying_pan(r);
           r.eject();
-          move_from_frying_pan_to_egg_box();
+          move_from_frying_pan_to_egg_box(r);
           r.release_claws();
           r.eject();
         }
 
         else {
-          move_from_last_pickup_site_to_chick_dropoff_site();
+          move_from_last_pickup_site_to_chick_dropoff_site(r);
           r.eject();
-          move_from_chick_dropoff_site_to_egg_box();
+          move_from_chick_dropoff_site_to_egg_box(r);
           r.release_claws();
           r.eject();
         }
       }
-      move_from_egg_box_to_start();
+      move_from_egg_box_to_start(r);
 
       if (eggs_picked == 4 and sw.read() > 240000) {
         // We have picked up four eggs, but there is less than 1 minute left, so stay at base.
-        return 0;
+        break;
       }
     }
-    return 0;
   }
   catch (idp::Robot::LineFollowingError& e) {
     // We're lost! Enter recovery mode now.  
