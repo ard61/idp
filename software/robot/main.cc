@@ -17,17 +17,17 @@ void move_from_start_to_intersection_above_pickup_site(idp::Robot& r) {
   IDP_INFO << "Following line until intersection" << std::endl;
   r.line_following_until_intersection();
 
-  IDP_INFO << "Following line for 55 cm" << std::endl;
-  r.line_following(0.55);
+  IDP_INFO << "Following line for 65 cm" << std::endl;
+  r.line_following(0.65);
   
-  IDP_INFO << "Turning clockwise by 30 degrees" << std::endl;
-  r.turn(-M_PI/6);
+  IDP_INFO << "Turning clockwise by 45 degrees" << std::endl;
+  r.turn(-M_PI/4);
   
   IDP_INFO << "Moving forward for 25 cm" << std::endl;
   r.move(full_forward, 0.25);
   
-  IDP_INFO << "Turning anticlockwise by 30 degrees" << std::endl;
-  r.turn(M_PI/6);
+  IDP_INFO << "Turning anticlockwise by 45 degrees" << std::endl;
+  r.turn(M_PI/4);
   
   IDP_INFO << "Moving forward until line is hit" << std::endl;
   r.move_until_hit_line(full_forward);
@@ -39,7 +39,7 @@ void move_from_start_to_intersection_above_pickup_site(idp::Robot& r) {
   r.line_following(0.45);
   
   IDP_INFO << "Moving forward for 15 cm" << std::endl;
-  r.move(full_forward, 0.2);
+  r.move(full_forward, 0.15);
   
   IDP_INFO << "Following line until intersection" << std::endl;
   r.line_following_until_intersection();
@@ -55,6 +55,9 @@ void move_from_start_to_intersection_above_pickup_site(idp::Robot& r) {
   
   IDP_INFO << "Turning anticlockwise for 90 degrees" << std::endl;
   r.turn_until_line(true);
+  
+  IDP_INFO << "Aligning robot." << std::endl;
+  r.align(); 
 }
 
 void move_from_intersection_above_pickup_site_to_frying_pan(idp::Robot &r) {

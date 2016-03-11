@@ -234,6 +234,8 @@ public:
   void turn_until_line2(const bool anticlockwise);
   void turn_until_orientation(const double final_orientation, const double angular_velocity);
   void turn_until_orientation(const double final_orientation);
+  
+  void align();
 
   // Position tracking
   struct Tracking {
@@ -289,6 +291,8 @@ public:
 
   void go_blind_iter(Vector2d target_position);
   void go_blind(Vector2d target_position);
+  
+  bool aligned();
 
   // Recovery
   void recovery();
