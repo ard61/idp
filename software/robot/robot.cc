@@ -16,7 +16,7 @@ idp::Robot::Robot() : actuator1_is_on(false), actuator2_is_on(false) {
   
   at_intersection = false;
   newly_arrived_at_intersection = false;
-  claws_are_open = true; // We always assume that robot starts with claws open.
+  claws_are_open = false; // We always assume that robot starts with claws closed.
 }
 
 idp::Robot::~Robot() {
@@ -56,7 +56,7 @@ void idp::Robot::load_constants() {
   _constants.intersection_threshold_distance = 0.05; // We are 'close' to an intersection if distance smaller than this value.
   
   // Egg processing
-  _constants.claw_open_time = 0.6;
+  _constants.claw_open_time = 0.8;
 
   // Put the first value of position and speed in the _tracking_history data structure
   idp::Timestamp<idp::Robot::Tracking> tracking;
@@ -119,6 +119,8 @@ void idp::Robot::configure() {
   actuator2_off();
   led1_off();
   led2_off();
+
+  claws_open();
   
   // Take initial sensor readings from light sensors to start populating history. 
   update_light_sensors();
@@ -481,10 +483,35 @@ void idp::Robot::line_following() {
       and line_sensors.front_centre == 0 
       and line_sensors.front_right == 0) {
     IDP_INFO << "All black" << std::endl;
+
+    idp::Robot::LightSensorValues prev_line_sensors = _light_sensors_history->at(_light_sensors_history->size() - 2).value.values;
     at_intersection = false;
     newly_arrived_at_intersection = false;
-    move(MotorDemand(0,0));
-    throw idp::Robot::LineFollowingError();
+
+    if (prev_line_sensors.front_left == 1
+        and prev_line_sensors.front_right == 0) {
+      move(calculate_demand(3));
+      while (!hit_line()) {
+        update_tracking();
+        update_light_sensors();
+      }
+      move(MotorDemand(0,0));
+    }
+      
+    else if (prev_line_sensors.front_right == 1
+             and prev_line_sensors.front_left == 0) {
+      move(calculate_demand(-3));
+      while (!hit_line()) {
+        update_tracking();
+        update_light_sensors();
+      }
+      move(MotorDemand(0,0));
+    }
+
+    else {
+      move(MotorDemand(0,0));
+      throw idp::Robot::LineFollowingError();
+    }
   }
   
   else if (line_sensors.front_left == 0 
@@ -495,7 +522,6 @@ void idp::Robot::line_following() {
     at_intersection = false;
     newly_arrived_at_intersection = false;
 
-    /*
     idp::Robot::LightSensorValues prev_line_sensors = _light_sensors_history->at(_light_sensors_history->size() - 2).value.values;
     
     if (prev_line_sensors.front_left == 1 
@@ -510,7 +536,7 @@ void idp::Robot::line_following() {
       turn_until_line2(true);
     }
     
-    else */move(MotorDemand(_constants.cruise_speed, _constants.cruise_speed));
+    else move(MotorDemand(_constants.cruise_speed, _constants.cruise_speed));
   }
 
   else if (line_sensors.front_left == 1
